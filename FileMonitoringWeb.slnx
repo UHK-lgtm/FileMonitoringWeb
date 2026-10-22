@@ -1,0 +1,5 @@
+<Solution>
+  <Folder Name="/Server/">
+    <Project Path="Server/FileMonitoringWeb.Server.csproj" />
+  </Folder>
+</Solution>
