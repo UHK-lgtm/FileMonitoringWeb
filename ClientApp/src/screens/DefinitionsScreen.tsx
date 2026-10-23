@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { api, messagesFrom, type AuditEntry, type MonitoringDefinition } from '../api'
 import { DefinitionForm } from '../components/DefinitionForm'
 import { ErrorList } from '../components/ErrorList'
+import { daysLabel } from '../definitionRules'
 import { StatCard } from '../components/StatCard'
 import { useToast } from '../components/toastContext'
 import { formatDateTime } from '../format'
@@ -219,7 +220,11 @@ export function DefinitionsScreen() {
                       </td>
                       <td>
                         {definition.frequency}
-                        <div className="muted small">{definition.fileNamePattern}</div>
+                        <div className="muted small">{daysLabel(definition.daysOfWeek)}</div>
+                        <div className="muted small">
+                          {definition.fileNamePattern}
+                          {definition.matchType === 'Regex' ? ' (regex)' : ''}
+                        </div>
                       </td>
                       <td>
                         {definition.expectedDeliveryTime}

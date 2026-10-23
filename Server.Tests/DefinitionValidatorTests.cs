@@ -68,7 +68,63 @@ public class DefinitionValidatorTests
     {
         var errors = DefinitionValidator.Validate(Valid() with { FileNamePattern = "folder/file.xlsx" });
 
-        Assert.Contains("fileNamePattern must be a file name only, without '/' or '\\'.", errors);
+        Assert.Contains("fileNamePattern must be a file name only, without '/'.", errors);
+    }
+
+    [Fact]
+    public void Regex_pattern_may_contain_backslash_escapes()
+    {
+        var errors = DefinitionValidator.Validate(Valid() with { MatchType = "Regex", FileNamePattern = @"ISINGIL_\d{8}\.out" });
+
+        Assert.Empty(errors);
+    }
+
+    [Fact]
+    public void Regex_pattern_must_compile()
+    {
+        var errors = DefinitionValidator.Validate(Valid() with { MatchType = "Regex", FileNamePattern = "([unclosed" });
+
+        Assert.Contains("fileNamePattern is not a valid regular expression.", errors);
+    }
+
+    [Fact]
+    public void Wildcard_pattern_rejects_backslashes()
+    {
+        var errors = DefinitionValidator.Validate(Valid() with { FileNamePattern = @"LU\*.xlsx" });
+
+        Assert.Contains("fileNamePattern must be a file name only, without '\\'.", errors);
+    }
+
+    [Fact]
+    public void Match_type_must_be_wildcard_or_regex()
+    {
+        var errors = DefinitionValidator.Validate(Valid() with { MatchType = "Glob" });
+
+        Assert.Contains("matchType must be Wildcard or Regex.", errors);
+    }
+
+    [Fact]
+    public void Weekday_list_is_valid_when_each_day_is_one_to_seven_once()
+    {
+        var errors = DefinitionValidator.Validate(Valid() with { DaysOfWeek = new[] { 1, 2, 3, 4, 5 } });
+
+        Assert.Empty(errors);
+    }
+
+    [Fact]
+    public void Weekday_outside_one_to_seven_is_rejected()
+    {
+        var errors = DefinitionValidator.Validate(Valid() with { DaysOfWeek = new[] { 0, 8 } });
+
+        Assert.Contains("daysOfWeek values must be between 1 (Monday) and 7 (Sunday).", errors);
+    }
+
+    [Fact]
+    public void Repeated_weekday_is_rejected()
+    {
+        var errors = DefinitionValidator.Validate(Valid() with { DaysOfWeek = new[] { 1, 1 } });
+
+        Assert.Contains("daysOfWeek must not repeat a day.", errors);
     }
 
     [Fact]

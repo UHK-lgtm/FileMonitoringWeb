@@ -11,6 +11,8 @@ public static class DefinitionValidator
 
     private static readonly HashSet<string> Frequencies = new(StringComparer.Ordinal) { "Daily", "Weekly", "EveryNDays", "Monthly", "Quarterly" };
     private static readonly HashSet<string> DateModes = new(StringComparer.Ordinal) { "NoDate", "SameDay", "PreviousDay", "MonthYear" };
+    private static readonly HashSet<string> MatchTypes = new(StringComparer.Ordinal) { "Wildcard", "Regex" };
+    private static readonly TimeSpan RegexTimeout = TimeSpan.FromSeconds(2);
 
     public static IReadOnlyList<string> Validate(DefinitionInput input)
     {
@@ -19,7 +21,9 @@ public static class DefinitionValidator
         ValidateText(input.Name, "name", 200, required: true, errors);
         ValidateText(input.Provider, "provider", 100, required: false, errors);
         ValidateRelativePath(input.RelativePath, errors);
-        ValidateFileNamePattern(input.FileNamePattern, errors);
+        ValidateMatchType(input.MatchType, errors);
+        ValidateFileNamePattern(input.FileNamePattern, input.MatchType, errors);
+        ValidateDaysOfWeek(input.DaysOfWeek, errors);
 
         if (input.ExpectedFileCount < 1)
             errors.Add("expectedFileCount must be at least 1.");
@@ -63,15 +67,62 @@ public static class DefinitionValidator
             errors.Add("relativePath must not contain empty, '.' or '..' segments.");
     }
 
-    private static void ValidateFileNamePattern(string? value, List<string> errors)
+    private static void ValidateMatchType(string? value, List<string> errors)
+    {
+        if (value is null || !MatchTypes.Contains(value))
+            errors.Add("matchType must be Wildcard or Regex.");
+    }
+
+    /// Wildcard patterns cannot contain '\'. Regex patterns can, because the escapes need it. Both must stay a file name only.
+    private static void ValidateFileNamePattern(string? value, string? matchType, List<string> errors)
     {
         var pattern = value?.Trim() ?? string.Empty;
         if (pattern.Length == 0)
+        {
             errors.Add("fileNamePattern is required.");
-        else if (pattern.Length > 260)
+            return;
+        }
+
+        if (pattern.Length > 260)
+        {
             errors.Add("fileNamePattern must be at most 260 characters.");
-        else if (pattern.Contains('/') || pattern.Contains('\\'))
-            errors.Add("fileNamePattern must be a file name only, without '/' or '\\'.");
+            return;
+        }
+
+        if (pattern.Contains('/'))
+        {
+            errors.Add("fileNamePattern must be a file name only, without '/'.");
+            return;
+        }
+
+        if (matchType == "Regex")
+        {
+            try
+            {
+                _ = new System.Text.RegularExpressions.Regex($"^(?:{pattern})$", System.Text.RegularExpressions.RegexOptions.IgnoreCase, RegexTimeout);
+            }
+            catch (ArgumentException)
+            {
+                errors.Add("fileNamePattern is not a valid regular expression.");
+            }
+        }
+        else if (pattern.Contains('\\'))
+        {
+            errors.Add("fileNamePattern must be a file name only, without '\\'.");
+        }
+    }
+
+    /// Null or empty means every day. Otherwise each value is an ISO weekday, 1 (Monday) to 7 (Sunday), listed once.
+    private static void ValidateDaysOfWeek(IReadOnlyList<int>? days, List<string> errors)
+    {
+        if (days is null || days.Count == 0)
+            return;
+
+        if (days.Any(day => day is < 1 or > 7))
+            errors.Add("daysOfWeek values must be between 1 (Monday) and 7 (Sunday).");
+
+        if (days.Distinct().Count() != days.Count)
+            errors.Add("daysOfWeek must not repeat a day.");
     }
 
     private static void ValidateSchedule(DefinitionInput input, List<string> errors)

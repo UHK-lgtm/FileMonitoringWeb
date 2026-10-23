@@ -4,8 +4,30 @@ import type { MonitoringDefinitionInput } from './api'
 
 const timePattern = /^([01]\d|2[0-3]):[0-5]\d$/
 
+const weekdayShortNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+
 function isInRange(value: number | null, min: number, max: number): value is number {
   return value !== null && Number.isInteger(value) && value >= min && value <= max
+}
+
+function isValidRegex(pattern: string): boolean {
+  try {
+    return new RegExp(pattern, 'i') instanceof RegExp
+  } catch {
+    return false
+  }
+}
+
+/// Short text for the list: "Every day" when no days are chosen, otherwise "Mon Tue Wed".
+export function daysLabel(days: number[] | null): string {
+  if (days === null || days.length === 0) {
+    return 'Every day'
+  }
+
+  return [...days]
+    .sort((a, b) => a - b)
+    .map((day) => weekdayShortNames[day - 1] ?? '?')
+    .join(' ')
 }
 
 export function validateDefinition(definition: MonitoringDefinitionInput): string[] {
@@ -33,8 +55,26 @@ export function validateDefinition(definition: MonitoringDefinitionInput): strin
     errors.push('File name pattern is required.')
   } else if (pattern.length > 260) {
     errors.push('File name pattern must be at most 260 characters.')
+  } else if (definition.matchType === 'Regex') {
+    if (pattern.includes('/')) {
+      errors.push('A regular expression must not contain "/".')
+    } else if (!isValidRegex(pattern)) {
+      errors.push('File name pattern is not a valid regular expression.')
+    }
   } else if (pattern.includes('/') || pattern.includes('\\')) {
     errors.push('File name pattern must not contain "/" or "\\".')
+  }
+
+  if (definition.matchType !== 'Wildcard' && definition.matchType !== 'Regex') {
+    errors.push('Match type must be Wildcard or Regex.')
+  }
+
+  if (definition.daysOfWeek !== null) {
+    const days = definition.daysOfWeek
+    const allValid = days.every((day) => isInRange(day, 1, 7))
+    if (!allValid || new Set(days).size !== days.length) {
+      errors.push('Days must be weekdays 1 to 7, with no duplicates.')
+    }
   }
 
   const hasDateToken = pattern.includes('{date}')
@@ -124,6 +164,10 @@ export function toPayload(definition: MonitoringDefinitionInput): MonitoringDefi
     relativePath: definition.relativePath.trim(),
     fileNamePattern: definition.fileNamePattern.trim(),
     timeZoneId: definition.timeZoneId.trim(),
+    daysOfWeek:
+      definition.daysOfWeek && definition.daysOfWeek.length > 0
+        ? [...definition.daysOfWeek].sort((a, b) => a - b)
+        : null,
     isoWeekday: isWeekly ? definition.isoWeekday : null,
     intervalDays: isEveryN ? definition.intervalDays : null,
     anchorDate: isEveryN ? definition.anchorDate : null,

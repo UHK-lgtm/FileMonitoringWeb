@@ -95,8 +95,10 @@ All fields are returned by `GET`. `POST` and `PUT` accept the same fields, excep
   "provider": "BNP",
   "relativePath": "BNP_FUND_ACCOUNTING/IN/PRD/test",
   "fileNamePattern": "LU_PO_FIO_20260112.xlsx",
+  "matchType": "Wildcard",
   "expectedFileCount": 1,
   "frequency": "Daily",
+  "daysOfWeek": null,
   "isoWeekday": null,
   "intervalDays": null,
   "anchorDate": null,
@@ -121,7 +123,9 @@ Field rules (the server checks these, and the SQL check constraints back them up
 - `name`: required, at most 200 characters.
 - `provider`: at most 100 characters. May be empty.
 - `relativePath`: relative to `IN/PRD`'s share root. No leading or trailing `/`, no `\`, no `:`, no empty, `.` or `..` segments. Empty means the share root.
-- `fileNamePattern`: required, at most 260 characters, no `/` or `\`. Wildcards `*` and `?` allowed.
+- `matchType`: `Wildcard` or `Regex`. Required. `Wildcard` is the default for new definitions.
+- `fileNamePattern`: required, at most 260 characters, no `/`. For `Wildcard`, no `\`, and `*` and `?` are wildcards, matched case-insensitively. For `Regex`, a regular expression that must match the whole file name (case-insensitive). Backslashes are allowed. It must compile.
+- `daysOfWeek`: null, or a list of ISO weekdays with no duplicates, each 1 (Monday) to 7 (Sunday). Null or an empty list means every day. A delivery is planned only on these days. Stored as a comma list such as `1,2,3,4,5`.
 - `expectedFileCount`: at least 1.
 - `frequency`: one of `Daily`, `Weekly`, `EveryNDays`, `Monthly`, `Quarterly`.
   - `Weekly`: `isoWeekday` 1 (Monday) to 7 (Sunday) is required.

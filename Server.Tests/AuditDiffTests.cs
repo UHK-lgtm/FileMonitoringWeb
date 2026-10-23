@@ -69,6 +69,29 @@ public class AuditDiffTests
     }
 
     [Fact]
+    public void Weekday_change_is_recorded_as_a_comma_list()
+    {
+        var before = Definition() with { DaysOfWeek = new[] { 1, 2, 3, 4, 5 } };
+        var after = before with { DaysOfWeek = new[] { 1, 2, 3 } };
+
+        var change = Assert.Single(AuditDiff.Diff(before, after));
+
+        Assert.Equal("daysOfWeek", change.FieldName);
+        Assert.Equal("1,2,3,4,5", change.OldValue);
+        Assert.Equal("1,2,3", change.NewValue);
+    }
+
+    [Fact]
+    public void Match_type_change_is_recorded()
+    {
+        var change = Assert.Single(AuditDiff.Diff(Definition(), Definition() with { MatchType = "Regex" }));
+
+        Assert.Equal("matchType", change.FieldName);
+        Assert.Equal("Wildcard", change.OldValue);
+        Assert.Equal("Regex", change.NewValue);
+    }
+
+    [Fact]
     public void Dates_are_recorded_in_iso_format()
     {
         var before = Definition() with { Frequency = "EveryNDays", IntervalDays = 15, AnchorDate = new DateOnly(2026, 1, 1) };

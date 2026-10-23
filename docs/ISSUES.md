@@ -73,3 +73,4 @@ Add a row for each problem found during testing. Fix it here, then mark it `Fixe
 | ID | Found | Area | Symptom | Status | Fix |
 | --- | --- | --- | --- | --- | --- |
 | I-1 | | | | Open | |
+| I-2 | Build | G-9, G-10 | Regex matching, weekday schedules and their web fields were built in code. | Built, verify after deploy | `sql/003` then deploy both apps; then enable one imported flow and check its first run |

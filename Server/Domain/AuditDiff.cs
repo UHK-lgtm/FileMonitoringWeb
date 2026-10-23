@@ -12,6 +12,8 @@ public static class AuditDiff
         ("provider", d => d.Provider),
         ("relativePath", d => d.RelativePath),
         ("fileNamePattern", d => d.FileNamePattern),
+        ("matchType", d => d.MatchType),
+        ("daysOfWeek", d => d.DaysOfWeek),
         ("expectedFileCount", d => d.ExpectedFileCount),
         ("frequency", d => d.Frequency),
         ("isoWeekday", d => d.IsoWeekday),
@@ -51,6 +53,7 @@ public static class AuditDiff
         null => null,
         bool flag => flag ? "true" : "false",
         DateOnly date => date.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture),
+        IReadOnlyList<int> days => string.Join(',', days),
         IFormattable formattable => formattable.ToString(null, System.Globalization.CultureInfo.InvariantCulture),
         _ => value.ToString(),
     };

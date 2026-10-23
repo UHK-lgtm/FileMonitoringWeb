@@ -22,7 +22,8 @@ public sealed class MonitoringDefinitionRepository(IConfiguration configuration)
     private const string Columns = """
         Id, Name, Provider, RelativePath, FileNamePattern, ExpectedFileCount, Frequency, DayOfWeek, IntervalDays,
         AnchorDate, DayOfMonth, MonthOfQuarter, ExpectedDeliveryTime, BufferMinutes, TimeZoneId, FilenameDateMode,
-        FilenameDateFormat, SizeCheckEnabled, ReferenceSizeBytes, SizeTolerancePercent, IsEnabled, IsRetired, ConcurrencyToken
+        FilenameDateFormat, SizeCheckEnabled, ReferenceSizeBytes, SizeTolerancePercent, IsEnabled, IsRetired, ConcurrencyToken,
+        MatchType, DaysOfWeek
         """;
 
     private const string SelectAll = "SELECT " + Columns + " FROM FileScan.MonitoringDefinition ORDER BY Id;";
@@ -33,12 +34,12 @@ public sealed class MonitoringDefinitionRepository(IConfiguration configuration)
         INSERT INTO FileScan.MonitoringDefinition
             (Name, Provider, RelativePath, FileNamePattern, ExpectedFileCount, Frequency, DayOfWeek, IntervalDays,
              AnchorDate, DayOfMonth, MonthOfQuarter, ExpectedDeliveryTime, BufferMinutes, TimeZoneId, FilenameDateMode,
-             FilenameDateFormat, SizeCheckEnabled, ReferenceSizeBytes, SizeTolerancePercent, IsEnabled)
+             FilenameDateFormat, SizeCheckEnabled, ReferenceSizeBytes, SizeTolerancePercent, IsEnabled, MatchType, DaysOfWeek)
         OUTPUT INSERTED.Id
         VALUES
             (@Name, @Provider, @RelativePath, @FileNamePattern, @ExpectedFileCount, @Frequency, @DayOfWeek, @IntervalDays,
              @AnchorDate, @DayOfMonth, @MonthOfQuarter, @ExpectedDeliveryTime, @BufferMinutes, @TimeZoneId, @FilenameDateMode,
-             @FilenameDateFormat, @SizeCheckEnabled, @ReferenceSizeBytes, @SizeTolerancePercent, @IsEnabled);
+             @FilenameDateFormat, @SizeCheckEnabled, @ReferenceSizeBytes, @SizeTolerancePercent, @IsEnabled, @MatchType, @DaysOfWeek);
         """;
 
     private const string Update = """
@@ -49,7 +50,8 @@ public sealed class MonitoringDefinitionRepository(IConfiguration configuration)
             MonthOfQuarter = @MonthOfQuarter, ExpectedDeliveryTime = @ExpectedDeliveryTime, BufferMinutes = @BufferMinutes,
             TimeZoneId = @TimeZoneId, FilenameDateMode = @FilenameDateMode, FilenameDateFormat = @FilenameDateFormat,
             SizeCheckEnabled = @SizeCheckEnabled, ReferenceSizeBytes = @ReferenceSizeBytes,
-            SizeTolerancePercent = @SizeTolerancePercent, IsEnabled = @IsEnabled, UpdatedUtc = SYSUTCDATETIME()
+            SizeTolerancePercent = @SizeTolerancePercent, IsEnabled = @IsEnabled, MatchType = @MatchType,
+            DaysOfWeek = @DaysOfWeek, UpdatedUtc = SYSUTCDATETIME()
         WHERE Id = @Id AND ConcurrencyToken = @ConcurrencyToken;
         """;
 
@@ -307,7 +309,16 @@ public sealed class MonitoringDefinitionRepository(IConfiguration configuration)
         command.Parameters.Add("@ReferenceSizeBytes", SqlDbType.BigInt).Value = Nullable(input.ReferenceSizeBytes);
         command.Parameters.Add("@SizeTolerancePercent", SqlDbType.Decimal).Value = Nullable(input.SizeTolerancePercent);
         command.Parameters.Add("@IsEnabled", SqlDbType.Bit).Value = input.IsEnabled;
+        command.Parameters.Add("@MatchType", SqlDbType.NVarChar, 10).Value = input.MatchType!.Trim();
+        command.Parameters.Add("@DaysOfWeek", SqlDbType.NVarChar, 20).Value = (object?)FormatDays(input.DaysOfWeek) ?? DBNull.Value;
     }
+
+    /// Stored as a comma list such as "1,2,3,4,5". Null or empty means every day.
+    private static string? FormatDays(IReadOnlyList<int>? days) =>
+        days is { Count: > 0 } ? string.Join(',', days) : null;
+
+    private static IReadOnlyList<int>? ParseDays(string? value) =>
+        value is null ? null : value.Split(',').Select(int.Parse).ToArray();
 
     private static MonitoringDefinitionDto Read(SqlDataReader reader) =>
         new(
@@ -333,7 +344,9 @@ public sealed class MonitoringDefinitionRepository(IConfiguration configuration)
             SizeTolerancePercent: reader.IsDBNull(19) ? null : reader.GetDecimal(19),
             IsEnabled: reader.GetBoolean(20),
             IsRetired: reader.GetBoolean(21),
-            ConcurrencyToken: Convert.ToBase64String(reader.GetFieldValue<byte[]>(22)));
+            ConcurrencyToken: Convert.ToBase64String(reader.GetFieldValue<byte[]>(22)),
+            MatchType: reader.GetString(23),
+            DaysOfWeek: ParseDays(reader.IsDBNull(24) ? null : reader.GetString(24)));
 
     /// Columns: AuditId, ChangedAtUtc, ChangedBy, FieldName, OldValue, NewValue.
     private static AuditEntryDto ReadAudit(SqlDataReader reader) =>

@@ -661,6 +661,26 @@ label {
   width: auto;
 }
 
+.days-fieldset {
+  margin: 16px 0 0;
+  padding: 12px 14px;
+  border: 1px solid var(--c-border);
+  border-radius: 10px;
+}
+
+.days-fieldset legend {
+  padding: 0 6px;
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+
+.days {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 18px;
+  margin-top: 8px;
+}
+
 .actions {
   display: flex;
   flex-wrap: wrap;

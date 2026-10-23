@@ -1,5 +1,14 @@
 import { useState, type FormEvent, type ReactNode } from 'react'
-import { ApiError, api, messagesFrom, type FilenameDateMode, type FrequencyName, type MonitoringDefinition, type MonitoringDefinitionInput } from '../api'
+import {
+  ApiError,
+  api,
+  messagesFrom,
+  type FilenameDateMode,
+  type FrequencyName,
+  type MatchType,
+  type MonitoringDefinition,
+  type MonitoringDefinitionInput,
+} from '../api'
 import { validateDefinition, toPayload } from '../definitionRules'
 import { ErrorList } from './ErrorList'
 
@@ -14,6 +23,7 @@ interface DefinitionFormProps {
 
 const frequencies: FrequencyName[] = ['Daily', 'Weekly', 'EveryNDays', 'Monthly', 'Quarterly']
 const dateModes: FilenameDateMode[] = ['NoDate', 'SameDay', 'PreviousDay', 'MonthYear']
+const matchTypes: MatchType[] = ['Wildcard', 'Regex']
 const weekdays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
 
 function emptyDefinition(): MonitoringDefinitionInput {
@@ -22,8 +32,10 @@ function emptyDefinition(): MonitoringDefinitionInput {
     provider: '',
     relativePath: '',
     fileNamePattern: '',
+    matchType: 'Wildcard',
     expectedFileCount: 1,
     frequency: 'Daily',
+    daysOfWeek: null,
     isoWeekday: null,
     intervalDays: null,
     anchorDate: null,
@@ -68,6 +80,20 @@ export function DefinitionForm({ definition, readOnly, onSaved, onConflict, onCa
 
   function update<K extends keyof MonitoringDefinitionInput>(key: K, value: MonitoringDefinitionInput[K]) {
     setDraft((current) => ({ ...current, [key]: value }))
+  }
+
+  // No day ticked means every day, so the list becomes null when the last day is unticked.
+  function toggleDay(day: number, checked: boolean) {
+    setDraft((current) => {
+      const days = new Set(current.daysOfWeek ?? [])
+      if (checked) {
+        days.add(day)
+      } else {
+        days.delete(day)
+      }
+      const list = [...days].sort((a, b) => a - b)
+      return { ...current, daysOfWeek: list.length === 0 ? null : list }
+    })
   }
 
   async function save(event: FormEvent<HTMLFormElement>) {
@@ -124,7 +150,21 @@ export function DefinitionForm({ definition, readOnly, onSaved, onConflict, onCa
           <Field label="Relative path (inside IN/PRD, empty for share root)">
             <input value={draft.relativePath} onChange={(e) => update('relativePath', e.target.value)} />
           </Field>
-          <Field label="File name pattern (* and ? allowed)">
+          <Field label="Match type">
+            <select value={draft.matchType} onChange={(e) => update('matchType', e.target.value as MatchType)}>
+              {matchTypes.map((type) => (
+                <option key={type} value={type}>
+                  {type}
+                </option>
+              ))}
+            </select>
+            <span className="muted small">
+              {draft.matchType === 'Regex'
+                ? 'Regex: the whole file name must match the expression, for example ISINGIL_\\d{8}\\.out. Case-insensitive.'
+                : 'Wildcard: * matches any characters and ? matches one character. Case-insensitive.'}
+            </span>
+          </Field>
+          <Field label={draft.matchType === 'Regex' ? 'File name pattern (regular expression)' : 'File name pattern (* and ? allowed)'}>
             <input value={draft.fileNamePattern} onChange={(e) => update('fileNamePattern', e.target.value)} maxLength={260} />
           </Field>
           <Field label="Expected file count">
@@ -236,6 +276,26 @@ export function DefinitionForm({ definition, readOnly, onSaved, onConflict, onCa
             </Field>
           )}
         </div>
+
+        <fieldset className="days-fieldset">
+          <legend>Days the delivery is expected</legend>
+          <p className="muted small">No day ticked means every day.</p>
+          <div className="days">
+            {weekdays.map((name, index) => {
+              const day = index + 1
+              return (
+                <label key={name} className="checkbox" aria-label={name}>
+                  <input
+                    type="checkbox"
+                    checked={draft.daysOfWeek?.includes(day) ?? false}
+                    onChange={(e) => toggleDay(day, e.target.checked)}
+                  />
+                  {name.slice(0, 3)}
+                </label>
+              )
+            })}
+          </div>
+        </fieldset>
 
         <div className="form-grid">
           <label className="checkbox">

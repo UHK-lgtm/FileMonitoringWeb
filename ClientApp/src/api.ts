@@ -3,6 +3,7 @@
 export type DeliveryStatus = 'Pending' | 'OnTime' | 'Missing' | 'Incomplete' | 'Late'
 export type FrequencyName = 'Daily' | 'Weekly' | 'EveryNDays' | 'Monthly' | 'Quarterly'
 export type FilenameDateMode = 'NoDate' | 'SameDay' | 'PreviousDay' | 'MonthYear'
+export type MatchType = 'Wildcard' | 'Regex'
 
 export interface DeliverySummary {
   expectedDeliveryId: number
@@ -88,8 +89,10 @@ export interface MonitoringDefinition {
   provider: string
   relativePath: string
   fileNamePattern: string
+  matchType: MatchType
   expectedFileCount: number
   frequency: FrequencyName
+  daysOfWeek: number[] | null
   isoWeekday: number | null
   intervalDays: number | null
   anchorDate: string | null

@@ -11,6 +11,15 @@ Schema for the File Monitoring solution, shared by this web app and the FileScan
 | `004_seed_production_flows.sql` | Inserts the 62 production flows from the flow list, all **disabled**. Insert only: existing rows are never changed. Requires 003. |
 | `002_create_v1_schema.sql` | Adds the V1 configuration columns to `MonitoringDefinition`, and creates `MonitoringDefinitionAudit`, `ExpectedDelivery`, `DeliveryStatusTransition`, `FileObservation`, `DeliveryWarning` and `IncidentComment`. Additive only. Requires 001. |
 
+## What to run now
+
+Run these in order against the shared database. Skip any you have already run; `001` and `002` should already be applied.
+
+1. `003_match_type_and_days.sql` (adds `MatchType` and `DaysOfWeek`)
+2. `004_seed_production_flows.sql` (adds the 62 production flows, all disabled)
+
+Deploy the web app and the FileScan Function App after `003`, before enabling any imported flow.
+
 ## Running a script
 
 Run the scripts in number order against the database. Use the sqlcmd command below, or SSMS in SQLCMD mode, or paste the file into SSMS and run it there. The scripts are idempotent, so running them again is safe.

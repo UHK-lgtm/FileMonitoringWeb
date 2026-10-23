@@ -13,7 +13,7 @@ Projects:
 - `FileScan.MonitoringDefinition.DaysOfWeek` (ISO weekday list, such as `1,2,3,4,5`; NULL = every day). The scanner does not read it yet (ISSUES G-9).
 - `FileScan.ExpectedDelivery.MatchType` (snapshot). Written by the planning step once the scanner is updated.
 
-Neither app's code uses these yet. Until it does, do not enable the imported flows from script 004.
+Both apps now use these columns: the scanner reads `MatchType` and `DaysOfWeek` when it plans and matches deliveries, and the web app reads, writes and audits them. The imported flows from script 004 can be enabled once `003` and the new code are deployed.
 
 ## Tables in use
 

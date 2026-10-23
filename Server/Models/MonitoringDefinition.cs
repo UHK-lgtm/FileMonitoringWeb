@@ -24,7 +24,9 @@ public sealed record MonitoringDefinitionDto(
     decimal? SizeTolerancePercent,
     bool IsEnabled,
     bool IsRetired,
-    string ConcurrencyToken)
+    string ConcurrencyToken,
+    string MatchType = "Wildcard",
+    IReadOnlyList<int>? DaysOfWeek = null)
 {
     /// Builds the DTO that an update would produce from the input. Id, retirement and the token come from the stored row.
     public static MonitoringDefinitionDto FromInput(int id, DefinitionInput input, bool isRetired, string concurrencyToken) =>
@@ -50,7 +52,9 @@ public sealed record MonitoringDefinitionDto(
             input.SizeTolerancePercent,
             input.IsEnabled,
             isRetired,
-            concurrencyToken);
+            concurrencyToken,
+            input.MatchType!.Trim(),
+            input.DaysOfWeek is { Count: > 0 } days ? days.ToArray() : null);
 }
 
 /// The body of POST and PUT. Strings are checked by DefinitionValidator before they reach SQL.
@@ -75,7 +79,9 @@ public sealed record DefinitionInput(
     long? ReferenceSizeBytes,
     decimal? SizeTolerancePercent,
     bool IsEnabled,
-    string? ConcurrencyToken);
+    string? ConcurrencyToken,
+    string? MatchType = "Wildcard",
+    IReadOnlyList<int>? DaysOfWeek = null);
 
 /// One row of the configuration audit (spec section 20).
 public sealed record AuditEntryDto(
