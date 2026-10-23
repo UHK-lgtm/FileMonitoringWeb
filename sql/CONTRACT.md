@@ -61,9 +61,9 @@ One row per changed field. Columns: `AuditId`, `MonitoringDefinitionId`, `Change
 
 ### `FileScan.ExpectedDelivery`: written by FileScan
 
-The planning run (`ExpectedDeliveriesHttp`, and later the timer) inserts one row per scheduled definition and date, and the first `Pending` row in `DeliveryStatusTransition` with it. The Function App's database user needs `INSERT` on both tables.
+The production run (`ProductionScan` timer, planning step) inserts one row per scheduled definition and date, and the first `Pending` row in `DeliveryStatusTransition` with it. The Function App's database user needs `INSERT` on both tables.
 
-The evidence run (`DeliveryEvidenceHttp`, and later the timer) reads open deliveries, updates `ExpectedDelivery` (received count, status, completion time), and writes `FileObservation`, `DeliveryStatusTransition` and `DeliveryWarning`. The Function App's user needs `SELECT`, `INSERT` and `UPDATE` on `ExpectedDelivery`, and `INSERT` on the other three tables. Script `002` does not grant any of these, so add the grants for the Function App's user before the first run.
+The production run (`ProductionScan` timer, evidence step) reads open deliveries, updates `ExpectedDelivery` (received count, status, completion time), and writes `FileObservation`, `DeliveryStatusTransition` and `DeliveryWarning`. The Function App's user needs `SELECT`, `INSERT` and `UPDATE` on `ExpectedDelivery`, and `INSERT` on the other three tables. Script `002` does not grant any of these, so add the grants for the Function App's user before the first run.
 
 One row per definition and expected date (unique on `MonitoringDefinitionId`, `ExpectedDate`). It holds the effective values that applied when the delivery was evaluated (`RelativePath`, `FileNamePattern`, `ExpectedDeliveryTime`, `BufferMinutes`, `TimeZoneId`, `DeadlineUtc`, `ExpectedFileCount`) and the current state (`ReceivedFileCount`, `CurrentStatus`, `StatusChangedUtc`, `CompletedAtUtc`, `LastScannedUtc`).
 

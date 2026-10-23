@@ -27,7 +27,7 @@ Status values: `Open` (needs work), `Decided` (chosen, with a reason), `Fixed`, 
 | G-1 | No roles. Every signed-in user can edit definitions and add comments. | Anyone with access can change configuration. | Viewer and Admin roles, with Entra app roles, after this release. The spec defers them. |
 | G-2 | "Not Expected" is not shown on the Today screen. | A definition not scheduled today does not appear. | The API needs the schedule rules to report it. |
 | G-3 | Size warnings are not raised, only unexpected-file warnings. | The size-check settings are saved but have no effect yet. | Size check in `FileScan` evidence. |
-| G-4 | The timer does not run the planning or the evidence run yet. Both are HTTP triggers, so someone must call them. | Statuses only change when the HTTP trigger is called. | Timer trigger after the first real run is verified. |
+| G-4 | The production timer (`ProductionScan`) runs planning and evidence on the `ScanSchedule` setting. It is built, not yet verified in Azure. | Statuses change on their own once the timer runs, so verify the first run first. | Verify the first run in Azure, then mark this fixed. |
 | G-5 | Warnings are never resolved automatically. | A warning stays open after its cause is fixed. | Resolve rule in the evidence run. |
 | G-6 | Local testing of the web app cannot pass Entra sign-in. Writes need the `X-MS-CLIENT-PRINCIPAL-NAME` header. | Writes cannot be tested on a laptop without the header. | Test in Azure, or send the header by hand for a local test only. |
 | G-7 | Retired definitions stay in the list (greyed) and cannot be enabled. | Lists grow over time. | Filter in the UI. |

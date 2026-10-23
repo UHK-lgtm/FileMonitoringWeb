@@ -40,7 +40,7 @@ This repo owns the SQL schema for the File Monitoring solution. The FileScan rep
   1. `sql/CONTRACT.md` lists every table and column each project uses, and whether it reads or writes it. Update it in the same change as any schema change.
   2. A schema change and the code that depends on it go in the same commit, or in commits pushed together. Never push a schema change that the other project depends on without the matching code change.
   3. Before pushing, both projects must build: `dotnet build` in this repo and in `../FileScan` (`dotnet build FileScannerFunctionApp/FileScannerFunctionApp.csproj`).
-  4. After deploying a schema change, run two smoke checks: `GET /api/monitoring-definitions` returns rows, and FileScan's test HTTP function loads Id 1 with no errors.
+  4. After deploying a schema change, run two smoke checks: `GET /api/monitoring-definitions` returns rows, and the next FileScan `ProductionScan` run completes with no errors.
   5. Prefer additive changes: new nullable columns and new tables are safe. Rename or drop in two steps, with the code change between them.
 - If a schema change and a spec disagree, ask which is right and update the doc first.
 
