@@ -61,6 +61,8 @@ One row per changed field. Columns: `AuditId`, `MonitoringDefinitionId`, `Change
 
 ### `FileScan.ExpectedDelivery`: written by FileScan
 
+The planning run (`ExpectedDeliveriesHttp`, and later the timer) inserts one row per scheduled definition and date, and the first `Pending` row in `DeliveryStatusTransition` with it. The Function App's database user needs `INSERT` on both tables. Status updates will need `UPDATE` on `ExpectedDelivery` when they arrive. Script `002` does not grant these, so add the grant for the Function App's user before the first run.
+
 One row per definition and expected date (unique on `MonitoringDefinitionId`, `ExpectedDate`). It holds the effective values that applied when the delivery was evaluated (`RelativePath`, `FileNamePattern`, `ExpectedDeliveryTime`, `BufferMinutes`, `TimeZoneId`, `DeadlineUtc`, `ExpectedFileCount`) and the current state (`ReceivedFileCount`, `CurrentStatus`, `StatusChangedUtc`, `CompletedAtUtc`, `LastScannedUtc`).
 
 ### `FileScan.DeliveryStatusTransition`: written by FileScan, append only
