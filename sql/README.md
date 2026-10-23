@@ -7,6 +7,8 @@ Schema for the File Monitoring solution, shared by this web app and the FileScan
 | Script | What it does |
 | --- | --- |
 | `001_create_monitoring_definition.sql` | Creates schema `FileScan` and table `FileScan.MonitoringDefinition`, and seeds the BNP test definition (Id 1). Moved here from the FileScan repo. |
+| `003_match_type_and_days.sql` | Adds `MatchType` (Wildcard or Regex) and `DaysOfWeek` to `MonitoringDefinition`, and `MatchType` to `ExpectedDelivery`. Requires 002. |
+| `004_seed_production_flows.sql` | Inserts the 62 production flows from the flow list, all **disabled**. Insert only: existing rows are never changed. Requires 003. |
 | `002_create_v1_schema.sql` | Adds the V1 configuration columns to `MonitoringDefinition`, and creates `MonitoringDefinitionAudit`, `ExpectedDelivery`, `DeliveryStatusTransition`, `FileObservation`, `DeliveryWarning` and `IncidentComment`. Additive only. Requires 001. |
 
 ## Running a script

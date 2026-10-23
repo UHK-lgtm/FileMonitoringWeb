@@ -7,6 +7,14 @@ Projects:
 - **Web**: this repo, ASP.NET Core API (`Server/`).
 - **FileScan**: `../FileScan`, Azure Function app (`FileScannerFunctionApp/`).
 
+## Columns added by 003
+
+- `FileScan.MonitoringDefinition.MatchType` (`Wildcard` or `Regex`). The scanner does not read it yet (ISSUES G-9).
+- `FileScan.MonitoringDefinition.DaysOfWeek` (ISO weekday list, such as `1,2,3,4,5`; NULL = every day). The scanner does not read it yet (ISSUES G-9).
+- `FileScan.ExpectedDelivery.MatchType` (snapshot). Written by the planning step once the scanner is updated.
+
+Neither app's code uses these yet. Until it does, do not enable the imported flows from script 004.
+
 ## Tables in use
 
 ### `FileScan.MonitoringDefinition`

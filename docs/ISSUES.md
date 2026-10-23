@@ -20,6 +20,9 @@ Status values: `Open` (needs work), `Decided` (chosen, with a reason), `Fixed`, 
 | D-10 | Status values are stored as `Pending`, `OnTime`, `Missing`, `Incomplete`, `Late`. The UI shows "On Time". | Matches the schema check constraints. | `sql/002_create_v1_schema.sql` |
 | D-11 | The web app runs the frontend with no router, using a sidebar and sections in one page. | Fewer moving parts for a deadline. | `ClientApp/src/App.tsx` |
 | D-12 | Brand red is interim: `#c21b17` (RGB 194-27-23), taken from the Generali Travel Insurance (US) brand guidelines, a different Generali entity. The sidebar shows a text wordmark, "Generali Investments", not a logo. | The official Generali Investments palette and logo files were not found online. | `ClientApp/src/App.css` (`--c-brand`, `--c-brand-dark`) and `ClientApp/src/App.tsx` (brand block) |
+| D-14 | Each imported flow: `BeginningTime` is the expected delivery time, and `EndTime` is the deadline (`BufferMinutes` = End − Begin). | The model has one expected time and a buffer, so the window maps onto them. | `sql/004_seed_production_flows.sql` |
+| D-15 | The 62 imported flows are inserted disabled. | Enabling them starts planning and scoring real folders. Enable only after the scanner reads `MatchType` and `DaysOfWeek`. | `sql/004_seed_production_flows.sql` |
+| D-16 | Imported flows use `Regex` matching, a whole-name match, with `NoDate`. | The flow list gives regular expressions, and the regexes already contain the date. | `sql/003_match_type_and_days.sql` |
 | D-13 | The Today dashboard summarises the loaded day only. Charts over time are not built, because they need new API endpoints. | Keeps the release on the existing contract. | `ClientApp/src/screens/TodayScreen.tsx` |
 
 ## Known gaps (accepted for this release)
@@ -33,6 +36,8 @@ Status values: `Open` (needs work), `Decided` (chosen, with a reason), `Fixed`, 
 | G-5 | Warnings are never resolved automatically. | A warning stays open after its cause is fixed. | Resolve rule in the evidence run. |
 | G-6 | Local testing of the web app cannot pass Entra sign-in. Writes need the `X-MS-CLIENT-PRINCIPAL-NAME` header. | Writes cannot be tested on a laptop without the header. | Test in Azure, or send the header by hand for a local test only. |
 | G-7 | Retired definitions stay in the list (greyed) and cannot be enabled. | Lists grow over time. | Filter in the UI. |
+| G-9 | The scanner does not yet read `MatchType` or `DaysOfWeek`. It matches wildcards only and plans every day. | Imported flows would be matched wrongly and planned on weekends. Keep the imported flows disabled until fixed. | Scanner change: a Regex match on the whole name, and a weekday filter in `ScheduleRules.IsExpectedOn`. Read the new columns in `ScheduledDefinitionRepository` and `ExpectedDelivery.MatchType`. |
+| G-10 | The web app does not show or edit `MatchType` or `DaysOfWeek`, and its validator rejects `\` in the file-name pattern. | A regex flow cannot be edited in the web app, and the edit form would show the wrong schedule. Saving does not clear these columns, because the update statement does not set them. | Add both fields to the web DTO, the input, the validator (allow regex and check it compiles) and the form. |
 | G-8 | The export has two sheets: configuration audit and deliveries. Comments and file evidence are not exported. | The spec asks for more detail in the audit export. | Add sheets once the audit view is confirmed. |
 
 ## Open questions for you
