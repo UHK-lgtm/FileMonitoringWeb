@@ -2,13 +2,12 @@ import { useEffect, useMemo, useState } from 'react'
 import { api, messagesFrom, type AuditEntry, type MonitoringDefinition } from '../api'
 import { DefinitionForm } from '../components/DefinitionForm'
 import { ErrorList } from '../components/ErrorList'
-import { daysLabel } from '../definitionRules'
-import { Modal } from '../components/Modal'
 import { StatCard } from '../components/StatCard'
 import { useToast } from '../components/toastContext'
+import { daysLabel } from '../definitionRules'
 import { formatDateTime } from '../format'
 
-// null: nothing selected. 'new': the create form. A number: the definition with that id.
+// null: the list. 'new': the create page. A number: the edit page for the definition with that id.
 type Selection = number | 'new' | null
 type StateFilter = 'All' | 'Enabled' | 'Disabled' | 'Retired'
 
@@ -135,6 +134,91 @@ export function DefinitionsScreen() {
     } finally {
       setBusyId(null)
     }
+  }
+
+  // The editor is its own page, like the delivery detail: a back button returns to the list.
+  if (selection !== null) {
+    const isNew = selection === 'new'
+    const title = isNew ? 'New definition' : selected?.name ?? 'Loading…'
+
+    return (
+      <>
+        <div className="toolbar">
+          <button type="button" className="button secondary" onClick={() => setSelection(null)}>
+            ← Back to definitions
+          </button>
+        </div>
+
+        {isNew && (
+          <section className="card">
+            <p className="eyebrow">Configuration</p>
+            <h2>{title}</h2>
+            <DefinitionForm
+              key="new"
+              definition={null}
+              readOnly={false}
+              onSaved={(saved) => {
+                setSelection(saved.id)
+                afterChange(`"${saved.name}" created.`)
+              }}
+              onConflict={() => setRevision((current) => current + 1)}
+              onCancel={() => setSelection(null)}
+            />
+          </section>
+        )}
+
+        {!isNew && selected === null && <p className="muted">Loading…</p>}
+
+        {!isNew && selected !== null && (
+          <>
+            <section className="card">
+              <p className="eyebrow">{selected.isRetired ? 'Retired definition' : 'Configuration'}</p>
+              <h2>{title}</h2>
+              <DefinitionForm
+                key={selected.id}
+                definition={selected}
+                readOnly={selected.isRetired}
+                onSaved={(saved) => afterChange(`"${saved.name}" saved.`)}
+                onConflict={() => setRevision((current) => current + 1)}
+                onCancel={() => setSelection(null)}
+              />
+            </section>
+
+            <section className="card">
+              <h3>Change history</h3>
+              {auditEntries.length === 0 ? (
+                <p className="muted">No changes recorded.</p>
+              ) : (
+                <div className="table-wrap">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>When</th>
+                        <th>Who</th>
+                        <th>Field</th>
+                        <th>Old value</th>
+                        <th>New value</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {auditEntries.map((entry) => (
+                        <tr key={entry.auditId}>
+                          <td>{formatDateTime(entry.changedAtUtc)}</td>
+                          <td>{entry.changedBy}</td>
+                          <td>{entry.fieldName}</td>
+                          <td className="mono">{entry.oldValue ?? '—'}</td>
+                          <td className="mono">{entry.newValue ?? '—'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </section>
+          </>
+        )}
+      </>
+    )
   }
 
   return (
@@ -267,67 +351,6 @@ export function DefinitionsScreen() {
           </div>
         )}
       </section>
-
-      {selection === 'new' && (
-        <Modal title="New definition" onClose={() => setSelection(null)}>
-          <DefinitionForm
-            key="new"
-            definition={null}
-            readOnly={false}
-            onSaved={(saved) => {
-              setSelection(saved.id)
-              afterChange(`"${saved.name}" created.`)
-            }}
-            onConflict={() => setRevision((current) => current + 1)}
-            onCancel={() => setSelection(null)}
-          />
-        </Modal>
-      )}
-
-      {selected !== null && (
-        <Modal title={selected.name} onClose={() => setSelection(null)}>
-          <DefinitionForm
-            key={selected.id}
-            definition={selected}
-            readOnly={selected.isRetired}
-            onSaved={(saved) => afterChange(`"${saved.name}" saved.`)}
-            onConflict={() => setRevision((current) => current + 1)}
-            onCancel={() => setSelection(null)}
-          />
-
-          <section className="history">
-            <h3>Change history</h3>
-            {auditEntries.length === 0 ? (
-              <p className="muted">No changes recorded.</p>
-            ) : (
-              <div className="table-wrap">
-                <table>
-                  <thead>
-                    <tr>
-                      <th>When</th>
-                      <th>Who</th>
-                      <th>Field</th>
-                      <th>Old value</th>
-                      <th>New value</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {auditEntries.map((entry) => (
-                      <tr key={entry.auditId}>
-                        <td>{formatDateTime(entry.changedAtUtc)}</td>
-                        <td>{entry.changedBy}</td>
-                        <td>{entry.fieldName}</td>
-                        <td className="mono">{entry.oldValue ?? '—'}</td>
-                        <td className="mono">{entry.newValue ?? '—'}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </section>
-        </Modal>
-      )}
     </>
   )
 }
