@@ -1,9 +1,10 @@
-/* Design tokens. Brand red is a placeholder: change --c-brand to the company colour and the rest follows. */
+/* Design tokens. The brand red is interim: RGB 194-27-23 from the Generali brand guidelines of a Generali entity.
+   Confirm the Generali Investments palette before wider use, then change --c-brand and the rest follows. */
 :root {
-  --c-brand: #c8102e;
-  --c-brand-dark: #9c0b24;
-  --c-brand-soft: #fdecef;
-  --c-brand-ring: rgba(200, 16, 46, 0.35);
+  --c-brand: #c21b17;
+  --c-brand-dark: #8a120f;
+  --c-brand-soft: #fbe9e8;
+  --c-brand-ring: rgba(194, 27, 23, 0.35);
 
   --c-bg: #f4f5f7;
   --c-surface: #ffffff;
@@ -90,6 +91,15 @@
   gap: 12px;
   font-weight: 700;
   font-size: 1.05rem;
+  line-height: 1.2;
+}
+
+.brand-text small {
+  display: block;
+  margin-top: 2px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  opacity: 0.8;
 }
 
 .brand-mark {

@@ -19,7 +19,7 @@ Status values: `Open` (needs work), `Decided` (chosen, with a reason), `Fixed`, 
 | D-9 | Errors return a fixed message. The log records the exception type only. | SQL messages can contain server names. | `Server/Program.cs`, `FileScan` services |
 | D-10 | Status values are stored as `Pending`, `OnTime`, `Missing`, `Incomplete`, `Late`. The UI shows "On Time". | Matches the schema check constraints. | `sql/002_create_v1_schema.sql` |
 | D-11 | The web app runs the frontend with no router, using a sidebar and sections in one page. | Fewer moving parts for a deadline. | `ClientApp/src/App.tsx` |
-| D-12 | Brand red is a placeholder (`#c8102e`). The look is set by design tokens at the top of the stylesheet. | The company colour was not supplied. | `ClientApp/src/App.css`, `--c-brand` and `--c-brand-dark` |
+| D-12 | Brand red is interim: `#c21b17` (RGB 194-27-23), taken from the Generali Travel Insurance (US) brand guidelines, a different Generali entity. The sidebar shows a text wordmark, "Generali Investments", not a logo. | The official Generali Investments palette and logo files were not found online. | `ClientApp/src/App.css` (`--c-brand`, `--c-brand-dark`) and `ClientApp/src/App.tsx` (brand block) |
 | D-13 | The Today dashboard summarises the loaded day only. Charts over time are not built, because they need new API endpoints. | Keeps the release on the existing contract. | `ClientApp/src/screens/TodayScreen.tsx` |
 
 ## Known gaps (accepted for this release)

@@ -30,9 +30,12 @@ function App() {
         <aside className="sidebar">
           <div className="brand">
             <span className="brand-mark" aria-hidden="true">
-              FM
+              GI
             </span>
-            <span>File Monitoring</span>
+            <span className="brand-text">
+              Generali Investments
+              <small>File Monitoring · Luxembourg</small>
+            </span>
           </div>
 
           <nav className="nav" aria-label="Sections">
