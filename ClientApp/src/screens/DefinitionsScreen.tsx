@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { api, messagesFrom, type AuditEntry, type MonitoringDefinition } from '../api'
 import { DefinitionForm } from '../components/DefinitionForm'
 import { ErrorList } from '../components/ErrorList'
 import { daysLabel } from '../definitionRules'
+import { Modal } from '../components/Modal'
 import { StatCard } from '../components/StatCard'
 import { useToast } from '../components/toastContext'
 import { formatDateTime } from '../format'
@@ -28,14 +29,6 @@ export function DefinitionsScreen() {
   const [filter, setFilter] = useState<StateFilter>('All')
   const [search, setSearch] = useState('')
   const notify = useToast()
-  const formRef = useRef<HTMLElement>(null)
-
-  // The form opens below a long list, so bring it into view when a definition is opened or a new one started.
-  useEffect(() => {
-    if (selection !== null) {
-      formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-    }
-  }, [selection])
 
   useEffect(() => {
     let ignore = false
@@ -276,7 +269,7 @@ export function DefinitionsScreen() {
       </section>
 
       {selection === 'new' && (
-        <section className="card" ref={formRef}>
+        <Modal title="New definition" onClose={() => setSelection(null)}>
           <DefinitionForm
             key="new"
             definition={null}
@@ -288,23 +281,21 @@ export function DefinitionsScreen() {
             onConflict={() => setRevision((current) => current + 1)}
             onCancel={() => setSelection(null)}
           />
-        </section>
+        </Modal>
       )}
 
       {selected !== null && (
-        <>
-          <section className="card" ref={formRef}>
-            <DefinitionForm
-              key={selected.id}
-              definition={selected}
-              readOnly={selected.isRetired}
-              onSaved={(saved) => afterChange(`"${saved.name}" saved.`)}
-              onConflict={() => setRevision((current) => current + 1)}
-              onCancel={() => setSelection(null)}
-            />
-          </section>
+        <Modal title={selected.name} onClose={() => setSelection(null)}>
+          <DefinitionForm
+            key={selected.id}
+            definition={selected}
+            readOnly={selected.isRetired}
+            onSaved={(saved) => afterChange(`"${saved.name}" saved.`)}
+            onConflict={() => setRevision((current) => current + 1)}
+            onCancel={() => setSelection(null)}
+          />
 
-          <section className="card">
+          <section className="history">
             <h3>Change history</h3>
             {auditEntries.length === 0 ? (
               <p className="muted">No changes recorded.</p>
@@ -335,7 +326,7 @@ export function DefinitionsScreen() {
               </div>
             )}
           </section>
-        </>
+        </Modal>
       )}
     </>
   )
