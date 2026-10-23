@@ -1,66 +1,57 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
+import './App.css'
+import { auditExportUrl } from './api'
+import { DefinitionsScreen } from './screens/DefinitionsScreen'
+import { DeliveryDetailScreen } from './screens/DeliveryDetailScreen'
+import { TodayScreen } from './screens/TodayScreen'
 
-type MonitoringDefinition = {
-  id: number
-  name: string
-  relativePath: string
-  fileNamePattern: string
-  isEnabled: boolean
-}
-
-type LoadState =
-  | { status: 'loading' }
-  | { status: 'error' }
-  | { status: 'ready'; definitions: MonitoringDefinition[] }
+type Tab = 'today' | 'definitions'
 
 function App() {
-  const [state, setState] = useState<LoadState>({ status: 'loading' })
+  const [tab, setTab] = useState<Tab>('today')
+  const [openDeliveryId, setOpenDeliveryId] = useState<number | null>(null)
 
-  useEffect(() => {
-    fetch('/api/monitoring-definitions')
-      .then((response) => {
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}`)
-        }
-        return response.json() as Promise<MonitoringDefinition[]>
-      })
-      .then((definitions) => setState({ status: 'ready', definitions }))
-      .catch(() => setState({ status: 'error' }))
-  }, [])
+  function selectTab(next: Tab) {
+    setTab(next)
+    setOpenDeliveryId(null)
+  }
 
   return (
-    <main>
-      <h1>File Monitoring</h1>
-      <h2>Monitoring Definitions</h2>
+    <div className="app">
+      <header className="app-header">
+        <h1>File Monitoring</h1>
+        <a className="button secondary" href={auditExportUrl}>
+          Export audit (Excel)
+        </a>
+      </header>
 
-      {state.status === 'loading' && <p>Loading...</p>}
-      {state.status === 'error' && <p>Could not load monitoring definitions.</p>}
+      <nav className="tabs" aria-label="Sections">
+        <button
+          type="button"
+          className={tab === 'today' ? 'tab active' : 'tab'}
+          aria-pressed={tab === 'today'}
+          onClick={() => selectTab('today')}
+        >
+          Today
+        </button>
+        <button
+          type="button"
+          className={tab === 'definitions' ? 'tab active' : 'tab'}
+          aria-pressed={tab === 'definitions'}
+          onClick={() => selectTab('definitions')}
+        >
+          Definitions
+        </button>
+      </nav>
 
-      {state.status === 'ready' && (
-        <table>
-          <thead>
-            <tr>
-              <th>Id</th>
-              <th>Name</th>
-              <th>Relative Path</th>
-              <th>File Pattern</th>
-              <th>Enabled</th>
-            </tr>
-          </thead>
-          <tbody>
-            {state.definitions.map((definition) => (
-              <tr key={definition.id}>
-                <td>{definition.id}</td>
-                <td>{definition.name}</td>
-                <td>{definition.relativePath}</td>
-                <td>{definition.fileNamePattern}</td>
-                <td>{definition.isEnabled ? 'Yes' : 'No'}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
-    </main>
+      <main className="page">
+        {tab === 'today' && openDeliveryId === null && <TodayScreen onOpen={setOpenDeliveryId} />}
+        {tab === 'today' && openDeliveryId !== null && (
+          <DeliveryDetailScreen expectedDeliveryId={openDeliveryId} onBack={() => setOpenDeliveryId(null)} />
+        )}
+        {tab === 'definitions' && <DefinitionsScreen />}
+      </main>
+    </div>
   )
 }
 

@@ -1,29 +1,30 @@
 using FileMonitoringWeb.Server.Data;
+using FileMonitoringWeb.Server.Endpoints;
+using Microsoft.AspNetCore.Diagnostics;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddSingleton<MonitoringDefinitionRepository>();
+builder.Services.AddSingleton<DeliveryRepository>();
 
 var app = builder.Build();
 
+// Unhandled errors return a fixed message. The log records the exception type only, because SQL messages can contain server names.
+app.UseExceptionHandler(errorApp => errorApp.Run(async context =>
+{
+    var error = context.Features.Get<IExceptionHandlerFeature>()?.Error;
+    var logger = context.RequestServices.GetRequiredService<ILogger<Program>>();
+    logger.LogError("Request failed: {ExceptionType}", error?.GetType().Name ?? "Unknown");
+
+    context.Response.StatusCode = StatusCodes.Status500InternalServerError;
+    await context.Response.WriteAsJsonAsync(new { message = "Something went wrong. Try again, and tell the administrator if it keeps happening." });
+}));
+
 app.MapGet("/api/health", () => Results.Ok(new { status = "ok" }));
 
-app.MapGet("/api/monitoring-definitions", async (
-    MonitoringDefinitionRepository repository,
-    ILogger<Program> logger,
-    CancellationToken cancellationToken) =>
-{
-    try
-    {
-        return Results.Ok(await repository.GetAllAsync(cancellationToken));
-    }
-    catch (Exception exception) when (!cancellationToken.IsCancellationRequested)
-    {
-        // Log the exception type only: SQL error messages can contain server names.
-        logger.LogError("Reading monitoring definitions failed: {ExceptionType}", exception.GetType().Name);
-        return Results.Problem(statusCode: StatusCodes.Status503ServiceUnavailable, title: "Monitoring definitions are unavailable.");
-    }
-});
+app.MapDefinitionEndpoints();
+app.MapDeliveryEndpoints();
+app.MapExportEndpoints();
 
 // Unknown API routes return 404 instead of the React index page.
 app.MapGet("/api/{**path}", () => Results.NotFound());

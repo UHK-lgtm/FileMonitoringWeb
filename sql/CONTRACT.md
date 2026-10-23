@@ -83,6 +83,22 @@ Warnings, separate from delivery status. `WarningType` is `SizeWarning` (per fil
 
 Comments and reasons on a delivery. Columns: `CommentId`, `ExpectedDeliveryId`, `CommentText`, `CreatedBy`, `CreatedAtUtc`. FileScan never writes this table.
 
+## Grants needed (not in the scripts)
+
+Script `002` does not grant permissions. Grant these before the first run, to the users the apps connect as.
+
+Web App user:
+
+- `SELECT`, `INSERT`, `UPDATE` on `FileScan.MonitoringDefinition`
+- `INSERT` on `FileScan.MonitoringDefinitionAudit` and `FileScan.IncidentComment`
+- `SELECT` on `FileScan.ExpectedDelivery`, `FileScan.DeliveryStatusTransition`, `FileScan.FileObservation` and `FileScan.DeliveryWarning`
+
+Function App user:
+
+- `SELECT` on `FileScan.MonitoringDefinition`
+- `SELECT`, `INSERT`, `UPDATE` on `FileScan.ExpectedDelivery`
+- `INSERT` on `FileScan.DeliveryStatusTransition`, `FileScan.FileObservation` and `FileScan.DeliveryWarning`
+
 ## Ownership summary
 
 | Table | Written by | Read by |

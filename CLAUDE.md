@@ -23,6 +23,7 @@ FileScan's docs (`FileScan/docs/`) describe the database and the scanner. Read t
 - `FileMonitoringWeb.slnx`: solution file (.NET 10 format)
 - `Server/`: ASP.NET Core backend API (serves the compiled React app and `/api/...`)
 - `ClientApp/`: React + TypeScript frontend (Vite). `npm run build` writes to `Server/wwwroot/`.
+- `Server.Tests/`: xUnit tests for the validation and audit rules.
 - `sql/`: schema scripts for the shared database. This repo owns them (see "Shared database").
 - `docs/`: documentation and project specification
 
@@ -46,7 +47,7 @@ This repo owns the SQL schema for the File Monitoring solution. The FileScan rep
 ## Rules
 
 - If code and a doc disagree, ask which is right and update the doc. Don't silently diverge.
-- The first milestone is read-only. Do not add create, edit or delete features for `MonitoringDefinition` yet.
+- The first milestone was read-only. Scope now includes the V1 web app: deliveries and status, delivery comments, and definition configuration with audit and Excel export, as in `docs/api-contract.md`. Roles and hard delete remain out of scope. See `docs/ISSUES.md`.
 - Do not build a direct path from the frontend to Azure File Share or to FileScan. The frontend calls only `/api/...`.
 - Do not expose SQL Server publicly. The Web App reaches it privately through VNet integration.
 - Use parameterized SQL only. Never build queries by concatenating untrusted input.
@@ -59,6 +60,7 @@ This repo owns the SQL schema for the File Monitoring solution. The FileScan rep
 
 Run from the repo root unless noted.
 
+- Tests: `dotnet test Server.Tests/FileMonitoringWeb.Server.Tests.csproj`. Must pass before a push.
 - Backend build: `dotnet build FileMonitoringWeb.slnx`
 - Backend run: `dotnet run --project Server` (HTTP on `http://localhost:5059`, from `Server/Properties/launchSettings.json`)
 - Frontend setup: `cd ClientApp && npm ci`

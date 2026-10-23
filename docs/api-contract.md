@@ -1,0 +1,188 @@
+# API contract (V1 web)
+
+The contract between the ASP.NET Core API (`Server/`) and the React app (`ClientApp/`). Both sides build to this document. Change it here first, then in the code.
+
+Scope: V1 as in `docs/File_Monitoring_V1_Specifications.md`, sections 19–23 and 25–27. Roles (Viewer/Admin) are not in this version. See `docs/ISSUES.md`.
+
+## Conventions
+
+- Base path: `/api`. Same origin as the React app, so no CORS.
+- All endpoints require Microsoft Entra ID sign-in. App Service enforces it. A request without a session gets 401 or a redirect, and the API returns no data.
+- The signed-in user comes from the `X-MS-CLIENT-PRINCIPAL-NAME` header that App Service adds. It is used for `ChangedBy` and `CreatedBy`. A request without it is rejected with 401.
+- JSON uses camelCase. Dates are ISO 8601. `…Utc` fields are UTC. `date` values are `yyyy-MM-dd`. `time` values are `HH:mm`.
+- Errors: `{ "errors": ["message", ...] }` for validation (400). `{ "message": "..." }` for other errors. Never SQL text, connection strings or stack traces.
+- Status values are exactly `Pending`, `OnTime`, `Missing`, `Incomplete`, `Late`. The UI shows "On Time" for `OnTime`.
+
+## Deliveries (read-only, plus comments)
+
+### `GET /api/deliveries?date=yyyy-MM-dd`
+
+Expected deliveries for one local date (Europe/Luxembourg). `date` is optional and defaults to today in Europe/Luxembourg.
+
+```json
+{
+  "date": "2026-10-23",
+  "items": [
+    {
+      "expectedDeliveryId": 1,
+      "monitoringDefinitionId": 1,
+      "definitionName": "BNP Fund Accounting Test",
+      "expectedDate": "2026-10-23",
+      "status": "Pending",
+      "expectedFileCount": 1,
+      "receivedFileCount": 0,
+      "unexpectedFileCount": 0,
+      "deadlineUtc": "2026-10-23T07:00:00Z",
+      "completedAtUtc": null,
+      "warningCount": 0
+    }
+  ]
+}
+```
+
+### `GET /api/deliveries/{id}`
+
+Detail for one expected delivery.
+
+```json
+{
+  "delivery": {
+    "expectedDeliveryId": 1,
+    "monitoringDefinitionId": 1,
+    "definitionName": "BNP Fund Accounting Test",
+    "expectedDate": "2026-10-23",
+    "relativePath": "BNP_FUND_ACCOUNTING/IN/PRD/test",
+    "fileNamePattern": "LU_PO_FIO_20260112.xlsx",
+    "timeZoneId": "Europe/Luxembourg",
+    "status": "Pending",
+    "expectedFileCount": 1,
+    "receivedFileCount": 0,
+    "unexpectedFileCount": 0,
+    "deadlineUtc": "2026-10-23T07:00:00Z",
+    "completedAtUtc": null
+  },
+  "transitions": [
+    { "fromStatus": null, "toStatus": "Pending", "occurredAtUtc": "...", "recordedAtUtc": "...", "expectedFileCount": 1, "receivedFileCount": 0, "deadlineUtc": "..." }
+  ],
+  "files": [
+    { "fileName": "...", "relativePath": "...", "sizeBytes": 6134328, "fileCreatedUtc": "...", "fileLastModifiedUtc": "...", "observedAtUtc": "...", "isUnexpected": false }
+  ],
+  "warnings": [
+    { "warningType": "UnexpectedFileWarning", "fileName": "", "detail": "1 file(s) beyond the expected count.", "detectedAtUtc": "...", "resolvedAtUtc": null }
+  ],
+  "comments": [
+    { "commentId": 1, "commentText": "...", "createdBy": "user@...", "createdAtUtc": "..." }
+  ]
+}
+```
+
+`transitions` are ordered by `occurredAtUtc`. `comments` are ordered by `createdAtUtc`. Unknown ids return 404.
+
+### `POST /api/deliveries/{id}/comments`
+
+Body: `{ "text": "..." }`. `text` is required, trimmed, and at most 2000 characters. Returns 201 with one comment object as in `comments`. Comments are append-only.
+
+## Monitoring definitions (configuration)
+
+### Definition object
+
+All fields are returned by `GET`. `POST` and `PUT` accept the same fields, except `id`, `isRetired` and `concurrencyToken` which the server sets.
+
+```json
+{
+  "id": 1,
+  "name": "BNP Fund Accounting Test",
+  "provider": "BNP",
+  "relativePath": "BNP_FUND_ACCOUNTING/IN/PRD/test",
+  "fileNamePattern": "LU_PO_FIO_20260112.xlsx",
+  "expectedFileCount": 1,
+  "frequency": "Daily",
+  "isoWeekday": null,
+  "intervalDays": null,
+  "anchorDate": null,
+  "dayOfMonth": null,
+  "monthOfQuarter": null,
+  "expectedDeliveryTime": "09:00",
+  "bufferMinutes": 0,
+  "timeZoneId": "Europe/Luxembourg",
+  "filenameDateMode": "NoDate",
+  "filenameDateFormat": null,
+  "sizeCheckEnabled": false,
+  "referenceSizeBytes": null,
+  "sizeTolerancePercent": null,
+  "isEnabled": true,
+  "isRetired": false,
+  "concurrencyToken": "AAAAAAAAB9E="
+}
+```
+
+Field rules (the server checks these, and the SQL check constraints back them up):
+
+- `name`: required, at most 200 characters.
+- `provider`: at most 100 characters. May be empty.
+- `relativePath`: relative to `IN/PRD`'s share root. No leading or trailing `/`, no `\`, no `:`, no empty, `.` or `..` segments. Empty means the share root.
+- `fileNamePattern`: required, at most 260 characters, no `/` or `\`. Wildcards `*` and `?` allowed.
+- `expectedFileCount`: at least 1.
+- `frequency`: one of `Daily`, `Weekly`, `EveryNDays`, `Monthly`, `Quarterly`.
+  - `Weekly`: `isoWeekday` 1 (Monday) to 7 (Sunday) is required.
+  - `EveryNDays`: `intervalDays` at least 1, and `anchorDate` is required.
+  - `Monthly`: `dayOfMonth` 1 to 31 is required. 31 means the last day in shorter months.
+  - `Quarterly`: `dayOfMonth` 1 to 31 and `monthOfQuarter` 1 to 3 are required.
+  - Fields that do not apply to the frequency must be null.
+- `expectedDeliveryTime`: `HH:mm`.
+- `bufferMinutes`: 0 to 1440.
+- `timeZoneId`: a valid IANA time zone, required.
+- `filenameDateMode`: one of `NoDate`, `SameDay`, `PreviousDay`, `MonthYear`. The `fileNamePattern` must contain `{date}` when the mode is not `NoDate`, and must not contain it when the mode is `NoDate`.
+- `filenameDateFormat`: required when the mode is not `NoDate`. A .NET date format such as `yyyyMMdd`.
+- `sizeCheckEnabled`: when true, `referenceSizeBytes` is above 0 and `sizeTolerancePercent` is 0 or more.
+
+### `GET /api/monitoring-definitions`
+
+Array of definition objects, including retired ones (`isRetired: true`). Ordered by `id`.
+
+### `GET /api/monitoring-definitions/{id}`
+
+One definition object. 404 if unknown.
+
+### `POST /api/monitoring-definitions`
+
+Creates a definition. Returns 201 with the new object. Writes one audit row with `fieldName` `(created)` and `newValue` set to the name.
+
+### `PUT /api/monitoring-definitions/{id}`
+
+Body is the full definition, including `concurrencyToken` as last read. Returns 200 with the updated object. Writes one audit row per changed field, with the old and new values. Returns 409 if `concurrencyToken` no longer matches, meaning someone else changed the row. The UI then reloads the definition.
+
+### `POST /api/monitoring-definitions/{id}/enabled`
+
+Body: `{ "isEnabled": true }`. Enables or disables the definition. Writes an audit row for `isEnabled`. A retired definition cannot be enabled (400).
+
+### `POST /api/monitoring-definitions/{id}/retire`
+
+Soft delete. Sets `isRetired` true, `isEnabled` false, and records who and when. Writes an audit row for `isRetired`. Hard delete is not offered. Returns 200 with the object.
+
+### `GET /api/monitoring-definitions/{id}/audit`
+
+Configuration audit for one definition, newest first:
+
+```json
+[
+  { "auditId": 1, "changedAtUtc": "...", "changedBy": "user@...", "fieldName": "fileNamePattern", "oldValue": "...", "newValue": "..." }
+]
+```
+
+## Export
+
+### `GET /api/export/audit.xlsx`
+
+Excel workbook built from saved SQL data only. It does not scan the file share. Sheets:
+
+- `Configuration audit`: every audit row, with the definition id and name.
+- `Deliveries`: every expected delivery, with status, counts, deadline, completion time and warning count.
+
+Served as `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet` with a file name of `file-monitoring-audit-{yyyyMMdd-HHmm}.xlsx`.
+
+## Not in this version
+
+- Roles (Viewer and Admin). The spec defers them until configuration editing exists. Every signed-in user can edit.
+- "Not Expected" in the deliveries list. The API does not evaluate schedules for the UI yet.
+- Excel export of comments and file observations beyond the two sheets above.
