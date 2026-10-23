@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { api, messagesFrom, type AuditEntry, type MonitoringDefinition } from '../api'
 import { DefinitionForm } from '../components/DefinitionForm'
 import { ErrorList } from '../components/ErrorList'
@@ -28,6 +28,14 @@ export function DefinitionsScreen() {
   const [filter, setFilter] = useState<StateFilter>('All')
   const [search, setSearch] = useState('')
   const notify = useToast()
+  const formRef = useRef<HTMLElement>(null)
+
+  // The form opens below a long list, so bring it into view when a definition is opened or a new one started.
+  useEffect(() => {
+    if (selection !== null) {
+      formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }
+  }, [selection])
 
   useEffect(() => {
     let ignore = false
@@ -234,6 +242,9 @@ export function DefinitionsScreen() {
                         <span className={pillClass}>{state}</span>
                       </td>
                       <td className="row-actions">
+                        <button type="button" className="button secondary" onClick={() => setSelection(definition.id)}>
+                          {definition.isRetired ? 'View' : 'Edit'}
+                        </button>
                         {!definition.isRetired && (
                           <>
                             <button
@@ -265,7 +276,7 @@ export function DefinitionsScreen() {
       </section>
 
       {selection === 'new' && (
-        <section className="card">
+        <section className="card" ref={formRef}>
           <DefinitionForm
             key="new"
             definition={null}
@@ -282,7 +293,7 @@ export function DefinitionsScreen() {
 
       {selected !== null && (
         <>
-          <section className="card">
+          <section className="card" ref={formRef}>
             <DefinitionForm
               key={selected.id}
               definition={selected}
