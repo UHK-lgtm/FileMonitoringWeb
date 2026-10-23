@@ -16,4 +16,9 @@ Scripts run in number order. Add new scripts as the next number; never rename or
 
 ## Before merging a change
 
-Apply the script to a dev copy of the database, then check both projects against it (see `../CLAUDE.md`, "Shared database").
+This is a proof of concept with one live database. Follow the rules in `../CLAUDE.md`, "Shared database":
+
+1. Update `CONTRACT.md` in the same change.
+2. Commit the schema change and the code that uses it together.
+3. Build both projects.
+4. After deploying, run the two smoke checks.
