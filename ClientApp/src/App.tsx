@@ -29,8 +29,8 @@ function App() {
       <div className="app">
         <aside className="sidebar">
           <div className="brand">
-            <span className="brand-mark" aria-hidden="true">
-              GI
+            <span className="brand-mark">
+              <img src="/generali-logo.png" alt="Generali" width="38" height="38" />
             </span>
             <span className="brand-text">
               Generali Investments
