@@ -451,7 +451,7 @@ Do NOT implement yet:
 - scanner orchestration
 - direct calls from React to FileScanner
 - delivery schedule configuration
-- Pending/On Time/Late/Missing/Delivery Failed rules
+- Pending/On Time/Missing/Incomplete/Late status rules (see `docs/File_Monitoring_V1_Specifications.md`, section 10)
 - notifications
 - email alerts
 - file content processing

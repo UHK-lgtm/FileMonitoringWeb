@@ -30,7 +30,7 @@ Queries:
 
 ## Planned tables (not created yet)
 
-From `../File_Monitoring_V1_Specifications.md`, sections 25–28. Add a row here when a script creates the table.
+From `../docs/File_Monitoring_V1_Specifications.md`, sections 25–28. Add a row here when a script creates the table.
 
 | Table | Written by |
 | --- | --- |

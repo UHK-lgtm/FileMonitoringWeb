@@ -13,6 +13,8 @@ FileScan (the Azure Function that scans the file share) is a separate repo. This
 The specification in `docs/` is the source of truth:
 
 - `docs/project-spec.md`: purpose, deployment architecture, first milestone, acceptance criteria and out-of-scope items
+- `docs/File_Monitoring_V1_Specifications.md`: the business rules for the whole solution (schedules, statuses, warnings, audit) and what the scanner, API and frontend each own
+- `docs/future-features.md`: items outside V1. Do not build them until they are moved into a current spec
 
 FileScan's docs (`FileScan/docs/`) describe the database and the scanner. Read them when the SQL contract matters.
 
@@ -30,7 +32,7 @@ This repo owns the SQL schema for the File Monitoring solution. The FileScan rep
 
 - All schema changes are scripts in `sql/`, numbered and idempotent (`002_...sql`, `003_...sql`). Never edit a script that has already been run against a shared database; add a new one.
 - Only this repo runs DDL. FileScan and the web app only read and write data.
-- Write ownership per table (from `File_Monitoring_V1_Specifications.md`, sections 25–28):
+- Write ownership per table (from `docs/File_Monitoring_V1_Specifications.md`, sections 25–28):
   - Web/API writes: Monitoring Definitions, configuration audit, comments/reasons.
   - FileScan writes: expected-delivery records, current status, file evidence, status transitions, warnings.
 - This is a proof of concept with one live database, and no dev copy. Keep both projects in step with these rules:

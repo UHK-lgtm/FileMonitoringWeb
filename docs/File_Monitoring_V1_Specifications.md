@@ -653,12 +653,4 @@ The exact SQL keys/upsert strategy will be finalized during database design.
 
 ## 30. Future Features
 
-Outside V1:
-
-- regional business/holiday calendars;
-- calendar-aware Previous Business Day;
-- Microsoft Teams notifications;
-- email notifications;
-- iTop ticketing integration;
-- advanced/statistical anomaly detection; and
-- other warning types not defined in this document.
+Items outside V1 are listed in `docs/future-features.md`.
