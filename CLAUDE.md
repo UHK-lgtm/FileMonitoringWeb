@@ -21,7 +21,25 @@ FileScan's docs (`FileScan/docs/`) describe the database and the scanner. Read t
 - `FileMonitoringWeb.slnx`: solution file (.NET 10 format)
 - `Server/`: ASP.NET Core backend API (serves the compiled React app and `/api/...`)
 - `ClientApp/`: React + TypeScript frontend (Vite). `npm run build` writes to `Server/wwwroot/`.
+- `sql/`: schema scripts for the shared database. This repo owns them (see "Shared database").
 - `docs/`: documentation and project specification
+
+## Shared database
+
+This repo owns the SQL schema for the File Monitoring solution. The FileScan repo (`../FileScan`, `FileScannerFunctionApp/`) reads and writes the same database and depends on it, so the two projects must be kept in step.
+
+- All schema changes are scripts in `sql/`, numbered and idempotent (`002_...sql`, `003_...sql`). Never edit a script that has already been run against a shared database; add a new one.
+- Only this repo runs DDL. FileScan and the web app only read and write data.
+- Write ownership per table (from `File_Monitoring_V1_Specifications.md`, sections 25–28):
+  - Web/API writes: Monitoring Definitions, configuration audit, comments/reasons.
+  - FileScan writes: expected-delivery records, current status, file evidence, status transitions, warnings.
+- Before a schema change is merged, validate that neither project breaks:
+  1. Apply the scripts to a dev copy of the database.
+  2. Build and test this web app against it.
+  3. Build FileScan and run its checks against it (`dotnet build FileScan/FileScannerFunctionApp/FileScannerFunctionApp.csproj` from `../FileScan`).
+  4. If either project breaks, fix it in the same change. Don't merge a change that leaves the other project broken.
+- Any change that renames, drops or changes the type of a column, table or constraint that FileScan uses must be recorded in the spec and mentioned in FileScan's `CLAUDE.md` or docs.
+- If a schema change and a spec disagree, ask which is right and update the doc first (same rule as above).
 
 ## Rules
 
