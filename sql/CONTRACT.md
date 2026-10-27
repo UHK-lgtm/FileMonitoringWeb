@@ -91,21 +91,28 @@ Warnings, separate from delivery status. `WarningType` is `SizeWarning` (per fil
 
 Comments and reasons on a delivery. Columns: `CommentId`, `ExpectedDeliveryId`, `CommentText`, `CreatedBy`, `CreatedAtUtc`. FileScan never writes this table.
 
+### `FileScan.ScanRun`: written by FileScan, read by Web
+
+Created by `005_create_scan_run.sql`. One row per production run. Columns: `ScanRunId`, `StartedUtc`, `FinishedUtc` (NULL while running or if the run was abandoned), `Status` (`Running`, `Succeeded`, `Failed`), `TriggerType` (`Timer`, `Manual` reserved), `ScheduledToday`, `OpenDeliveries`, `StatusChanges`, `FailureStage` (`Planning` or `Evidence`), `FailureType` (exception type name only), `InvocationId`.
+
+The web app shows the latest run only, and never returns `FailureStage` or `FailureType`. The Function App writes the row, and a failure to write it is logged without stopping the scan.
+
 ## Grants needed (not in the scripts)
 
-Script `002` does not grant permissions. Grant these before the first run, to the users the apps connect as.
+Scripts `002` and `005` do not grant permissions. Grant these before the first run, to the users the apps connect as.
 
 Web App user:
 
 - `SELECT`, `INSERT`, `UPDATE` on `FileScan.MonitoringDefinition`
 - `INSERT` on `FileScan.MonitoringDefinitionAudit` and `FileScan.IncidentComment`
-- `SELECT` on `FileScan.ExpectedDelivery`, `FileScan.DeliveryStatusTransition`, `FileScan.FileObservation` and `FileScan.DeliveryWarning`
+- `SELECT` on `FileScan.ExpectedDelivery`, `FileScan.DeliveryStatusTransition`, `FileScan.FileObservation`, `FileScan.DeliveryWarning` and `FileScan.ScanRun`
 
 Function App user:
 
 - `SELECT` on `FileScan.MonitoringDefinition`
 - `SELECT`, `INSERT`, `UPDATE` on `FileScan.ExpectedDelivery`
 - `INSERT` on `FileScan.DeliveryStatusTransition`, `FileScan.FileObservation` and `FileScan.DeliveryWarning`
+- `INSERT`, `UPDATE` on `FileScan.ScanRun`
 
 ## Ownership summary
 
@@ -118,5 +125,6 @@ Function App user:
 | `FileObservation` | FileScan | Web |
 | `DeliveryWarning` | FileScan | Web |
 | `IncidentComment` | Web | Web |
+| `ScanRun` | FileScan | Web |
 
 Both projects read the tables that the web app shows. Any change to a table in this list follows the rules in `../CLAUDE.md`, "Shared database".

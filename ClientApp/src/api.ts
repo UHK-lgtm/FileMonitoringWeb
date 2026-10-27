@@ -122,6 +122,30 @@ export interface AuditEntry {
   newValue: string | null
 }
 
+export type ScanDisplayState =
+  | 'NoRunRecorded'
+  | 'Current'
+  | 'Stale'
+  | 'Running'
+  | 'DidNotFinish'
+  | 'Failed'
+  | 'Unknown'
+
+export interface LatestScanRun {
+  scanRunId: number
+  startedUtc: string
+  finishedUtc: string | null
+  status: 'Running' | 'Succeeded' | 'Failed'
+  scheduledToday: number | null
+  openDeliveries: number | null
+  statusChanges: number | null
+}
+
+export interface LatestScanRunResponse {
+  state: ScanDisplayState
+  latest: LatestScanRun | null
+}
+
 export const genericMessage = 'Something went wrong. Try again.'
 export const sessionEndedMessage = 'Your session has ended. Reload the page to sign in again.'
 
@@ -209,6 +233,8 @@ export const api = {
   retireDefinition: (id: number) => request<MonitoringDefinition>('POST', `/monitoring-definitions/${id}/retire`),
 
   getAudit: (id: number) => request<AuditEntry[]>('GET', `/monitoring-definitions/${id}/audit`),
+
+  getLatestScanRun: () => request<LatestScanRunResponse>('GET', '/scan-runs/latest'),
 }
 
 export const auditExportUrl = '/api/export/audit.xlsx'

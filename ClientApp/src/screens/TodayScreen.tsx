@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { api, messagesFrom, type DeliveryStatus, type DeliverySummary } from '../api'
 import { ErrorList } from '../components/ErrorList'
 import { StatCard } from '../components/StatCard'
+import { ScanStatusLine } from '../components/ScanStatusLine'
 import { StatusBadge } from '../components/StatusBadge'
 import { formatDateTime, statusLabel, todayInLuxembourg } from '../format'
 
@@ -107,6 +108,7 @@ export function TodayScreen({ onOpen }: TodayScreenProps) {
 
   return (
     <>
+      <ScanStatusLine />
       <div className="toolbar">
         <div>
           <h2>{showingToday ? 'Today' : 'Deliveries'}</h2>

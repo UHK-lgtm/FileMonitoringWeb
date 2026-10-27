@@ -617,7 +617,8 @@ React owns the user experience for:
 - viewing delivery history;
 - viewing configuration audit;
 - adding comments/reasons; and
-- requesting Excel exports from the API.
+- requesting Excel exports from the API; and
+- showing the status of the last scan run.
 
 ---
 
@@ -633,8 +634,9 @@ SQL Server is the shared integration and persistence layer for:
 - status-transition audit;
 - physical file evidence/observations;
 - warnings;
-- comments/reasons; and
-- data used in Excel exports.
+- comments/reasons;
+- data used in Excel exports; and
+- scan run status (run log, one row per production run).
 
 ---
 

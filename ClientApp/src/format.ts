@@ -21,6 +21,19 @@ export function formatDateTime(value: string | null): string {
   return new Date(value).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
 }
 
+/// Shown in Europe/Luxembourg, the business time zone, for values that belong to the scanner (such as the last scan).
+export function formatLuxembourgDateTime(value: string | null): string {
+  if (value === null) {
+    return '—'
+  }
+
+  return new Date(value).toLocaleString('en-GB', {
+    timeZone: 'Europe/Luxembourg',
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  })
+}
+
 /// Today's date in Europe/Luxembourg as yyyy-MM-dd, the business date the API uses by default.
 export function todayInLuxembourg(): string {
   return new Intl.DateTimeFormat('en-CA', {

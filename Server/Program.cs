@@ -6,6 +6,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddSingleton<MonitoringDefinitionRepository>();
 builder.Services.AddSingleton<DeliveryRepository>();
+builder.Services.AddSingleton<ScanRunRepository>();
 
 var app = builder.Build();
 
@@ -25,6 +26,7 @@ app.MapGet("/api/health", () => Results.Ok(new { status = "ok" }));
 app.MapDefinitionEndpoints();
 app.MapDeliveryEndpoints();
 app.MapExportEndpoints();
+app.MapScanRunEndpoints();
 
 // Unknown API routes return 404 instead of the React index page.
 app.MapGet("/api/{**path}", () => Results.NotFound());

@@ -185,6 +185,39 @@ Excel workbook built from saved SQL data only. It does not scan the file share. 
 
 Served as `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet` with a file name of `file-monitoring-audit-{yyyyMMdd-HHmm}.xlsx`.
 
+## Scan status (read-only)
+
+### `GET /api/scan-runs/latest`
+
+The latest production scan run, and what it means for the "Last scan" line on Today.
+
+```json
+{
+  "state": "Current",
+  "latest": {
+    "scanRunId": 42,
+    "startedUtc": "2026-10-27T08:05:00Z",
+    "finishedUtc": "2026-10-27T08:05:03Z",
+    "status": "Succeeded",
+    "scheduledToday": 3,
+    "openDeliveries": 5,
+    "statusChanges": 1
+  }
+}
+```
+
+`state` is one of:
+
+- `NoRunRecorded`: no run has been recorded (`latest` is null).
+- `Current`: the latest run succeeded within the last 15 minutes.
+- `Stale`: the latest run succeeded more than 15 minutes ago.
+- `Running`: a run is in progress.
+- `DidNotFinish`: a run has been `Running` for more than 30 minutes.
+- `Failed`: the latest run failed.
+- `Unknown`: the status is not recognised, or the start time is in the future.
+
+The failure stage and failure type are not returned. They are in the logs, for operators. If the run table cannot be read (for example before `sql/005` has been run), the response is `503` with the title `Scan status is unavailable.`
+
 ## Not in this version
 
 - Roles (Viewer and Admin). The spec defers them until configuration editing exists. Every signed-in user can edit.
