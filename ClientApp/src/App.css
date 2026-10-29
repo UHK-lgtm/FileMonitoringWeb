@@ -527,11 +527,25 @@ tr.retired td {
   color: var(--c-text-muted);
 }
 
+/* The actions cell stays a normal table cell, so borders and row heights line up.
+   The buttons sit in an inner flex row, all the same size. */
+.actions-cell {
+  text-align: right;
+  white-space: nowrap;
+}
+
 .row-actions {
-  display: flex;
-  gap: 8px;
+  display: inline-flex;
+  align-items: center;
   justify-content: flex-end;
-  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.row-actions .button {
+  min-width: 92px;
+  min-height: 38px;
+  padding: 8px 14px;
+  box-shadow: none;
 }
 
 /* Buttons and links */

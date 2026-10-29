@@ -318,7 +318,8 @@ export function DefinitionsScreen() {
                       <td>
                         <span className={pillClass}>{state}</span>
                       </td>
-                      <td className="row-actions">
+                      <td className="actions-cell">
+                        <div className="row-actions">
                         <button type="button" className="button secondary" onClick={() => setSelection(definition.id)}>
                           {definition.isRetired ? 'View' : 'Edit'}
                         </button>
@@ -342,6 +343,7 @@ export function DefinitionsScreen() {
                             </button>
                           </>
                         )}
+                        </div>
                       </td>
                     </tr>
                   )
