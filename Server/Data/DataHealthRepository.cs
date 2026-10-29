@@ -37,44 +37,44 @@ public sealed class DataHealthRepository(IConfiguration configuration)
 
     private const string SelectControls = "SELECT " + ControlColumns + """
 
-        FROM DataHealth.Control AS c
-        JOIN DataHealth.ApprovedSource AS s ON s.ApprovedSourceId = c.ApprovedSourceId
+        FROM FileScan.DataHealthControl AS c
+        JOIN FileScan.DataHealthSource AS s ON s.ApprovedSourceId = c.ApprovedSourceId
         ORDER BY c.DisplayOrder, c.ControlId;
         """;
 
     private const string SelectControl = "SELECT " + ControlColumns + """
 
-        FROM DataHealth.Control AS c
-        JOIN DataHealth.ApprovedSource AS s ON s.ApprovedSourceId = c.ApprovedSourceId
+        FROM FileScan.DataHealthControl AS c
+        JOIN FileScan.DataHealthSource AS s ON s.ApprovedSourceId = c.ApprovedSourceId
         WHERE c.ControlId = @Id;
         """;
 
     private const string SelectControlForUpdate = "SELECT " + ControlColumns + """
 
-        FROM DataHealth.Control AS c WITH (UPDLOCK, HOLDLOCK)
-        JOIN DataHealth.ApprovedSource AS s ON s.ApprovedSourceId = c.ApprovedSourceId
+        FROM FileScan.DataHealthControl AS c WITH (UPDLOCK, HOLDLOCK)
+        JOIN FileScan.DataHealthSource AS s ON s.ApprovedSourceId = c.ApprovedSourceId
         WHERE c.ControlId = @Id;
         """;
 
     private const string SelectRunnable = """
         SELECT c.ControlId, c.Name, c.OffsetDays, c.OffsetType, c.HistoryDays, c.MissingCheck, c.DecreaseCheck,
                c.DecreaseTolerancePercent, s.DisplayName, s.SchemaName, s.ObjectName, s.DateColumn
-        FROM DataHealth.Control AS c
-        JOIN DataHealth.ApprovedSource AS s ON s.ApprovedSourceId = c.ApprovedSourceId
+        FROM FileScan.DataHealthControl AS c
+        JOIN FileScan.DataHealthSource AS s ON s.ApprovedSourceId = c.ApprovedSourceId
         WHERE c.IsEnabled = 1 AND c.IsRetired = 0 AND s.IsActive = 1
         ORDER BY c.DisplayOrder, c.ControlId;
         """;
 
     private const string SelectSources = """
         SELECT ApprovedSourceId, SourceKey, DisplayName, SchemaName, ObjectName, DateColumn
-        FROM DataHealth.ApprovedSource
+        FROM FileScan.DataHealthSource
         WHERE IsActive = 1
         ORDER BY DisplayName;
         """;
 
     private const string SelectSource = """
         SELECT ApprovedSourceId, SourceKey, DisplayName, SchemaName, ObjectName, DateColumn
-        FROM DataHealth.ApprovedSource
+        FROM FileScan.DataHealthSource
         WHERE ApprovedSourceId = @Id AND IsActive = 1;
         """;
 
@@ -90,7 +90,7 @@ public sealed class DataHealthRepository(IConfiguration configuration)
         """;
 
     private const string InsertControl = """
-        INSERT INTO DataHealth.Control
+        INSERT INTO FileScan.DataHealthControl
             (Name, DisplayOrder, IsEnabled, ApprovedSourceId, OffsetDays, OffsetType, HistoryDays, MissingCheck,
              DecreaseCheck, DecreaseTolerancePercent)
         OUTPUT INSERTED.ControlId
@@ -99,7 +99,7 @@ public sealed class DataHealthRepository(IConfiguration configuration)
         """;
 
     private const string UpdateControl = """
-        UPDATE DataHealth.Control
+        UPDATE FileScan.DataHealthControl
         SET Name = @Name, DisplayOrder = @DisplayOrder, IsEnabled = @IsEnabled, ApprovedSourceId = @ApprovedSourceId,
             OffsetDays = @OffsetDays, OffsetType = @OffsetType, HistoryDays = @HistoryDays,
             MissingCheck = @MissingCheck, DecreaseCheck = @DecreaseCheck,
@@ -108,23 +108,23 @@ public sealed class DataHealthRepository(IConfiguration configuration)
         """;
 
     private const string SetEnabled = """
-        UPDATE DataHealth.Control SET IsEnabled = @IsEnabled, UpdatedUtc = SYSUTCDATETIME() WHERE ControlId = @Id;
+        UPDATE FileScan.DataHealthControl SET IsEnabled = @IsEnabled, UpdatedUtc = SYSUTCDATETIME() WHERE ControlId = @Id;
         """;
 
     private const string RetireControl = """
-        UPDATE DataHealth.Control
+        UPDATE FileScan.DataHealthControl
         SET IsRetired = 1, IsEnabled = 0, RetiredAtUtc = SYSUTCDATETIME(), RetiredBy = @RetiredBy, UpdatedUtc = SYSUTCDATETIME()
         WHERE ControlId = @Id;
         """;
 
     private const string InsertAudit = """
-        INSERT INTO DataHealth.ControlAudit (ControlId, ChangedBy, FieldName, OldValue, NewValue)
+        INSERT INTO FileScan.DataHealthControlAudit (ControlId, ChangedBy, FieldName, OldValue, NewValue)
         VALUES (@ControlId, @ChangedBy, @FieldName, @OldValue, @NewValue);
         """;
 
     private const string SelectAudit = """
         SELECT AuditId, ChangedAtUtc, ChangedBy, FieldName, OldValue, NewValue
-        FROM DataHealth.ControlAudit
+        FROM FileScan.DataHealthControlAudit
         WHERE ControlId = @Id
         ORDER BY ChangedAtUtc DESC, AuditId DESC;
         """;

@@ -101,7 +101,7 @@ The web app shows the latest run only, and never returns `FailureStage` or `Fail
 
 The web app reads the approved sources and the controls, and counts rows in each approved source. FileScan does not use these tables.
 
-- Web App user: `SELECT` on `DataHealth.ApprovedSource`, `DataHealth.Control` and `DataHealth.ControlAudit`. `INSERT` and `UPDATE` on `DataHealth.Control`. `INSERT` on `DataHealth.ControlAudit`.
+- Web App user: `SELECT` on `FileScan.DataHealthSource`, `FileScan.DataHealthControl` and `FileScan.DataHealthControlAudit`. `INSERT` and `UPDATE` on `FileScan.DataHealthControl`. `INSERT` on `FileScan.DataHealthControlAudit`.
 - Web App user, for every approved source: `SELECT` on that table or view. Grant these one by one, when an admin adds the source. The check runs against the catalog before any count, so a missing grant shows as an Error row, not a crash.
 
 ## Grants needed (not in the scripts)

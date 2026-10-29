@@ -1,7 +1,8 @@
--- 006: Data Health schema. Requires 001-005 to be applied first (independent of the FileScan tables).
+-- 006: Data Health tables, in the FileScan schema like the other FileMonitoringWeb scripts.
+-- Requires 001 (which creates the FileScan schema). Independent of the FileScan Function's tables.
 -- Additive and idempotent: safe to run more than once. Nothing is dropped or retyped.
 --
--- DataHealth.ApprovedSource is the only list of tables the web app may count. It is filled by an admin script
+-- FileScan.DataHealthSource is the only list of tables the web app may count. It is filled by an admin script
 -- (see the seed template in this folder, 006_seed_data_health_sources_TEMPLATE.sql). The web app never writes to it,
 -- so users can only pick from this list. Controls reference a source; they never name a table directly.
 --
@@ -10,16 +11,16 @@
 SET NOCOUNT ON;
 GO
 
-IF SCHEMA_ID(N'DataHealth') IS NULL
-    EXEC (N'CREATE SCHEMA DataHealth AUTHORIZATION dbo');
+IF SCHEMA_ID(N'FileScan') IS NULL
+    EXEC (N'CREATE SCHEMA FileScan AUTHORIZATION dbo');
 GO
 
-IF OBJECT_ID(N'DataHealth.ApprovedSource', N'U') IS NULL
-    CREATE TABLE DataHealth.ApprovedSource (
+IF OBJECT_ID(N'FileScan.DataHealthSource', N'U') IS NULL
+    CREATE TABLE FileScan.DataHealthSource (
         ApprovedSourceId int           NOT NULL IDENTITY(1,1)
-            CONSTRAINT PK_DataHealth_ApprovedSource PRIMARY KEY,
+            CONSTRAINT PK_DataHealth_Source PRIMARY KEY,
         SourceKey        nvarchar(60)  NOT NULL
-            CONSTRAINT UQ_DataHealth_ApprovedSource_SourceKey UNIQUE,
+            CONSTRAINT UQ_DataHealth_Source_SourceKey UNIQUE,
         DisplayName      nvarchar(200) NOT NULL,
         SchemaName       nvarchar(128) NOT NULL,
         ObjectName       nvarchar(128) NOT NULL,
@@ -31,8 +32,8 @@ IF OBJECT_ID(N'DataHealth.ApprovedSource', N'U') IS NULL
     );
 GO
 
-IF OBJECT_ID(N'DataHealth.Control', N'U') IS NULL
-    CREATE TABLE DataHealth.Control (
+IF OBJECT_ID(N'FileScan.DataHealthControl', N'U') IS NULL
+    CREATE TABLE FileScan.DataHealthControl (
         ControlId                 int           NOT NULL IDENTITY(1,1)
             CONSTRAINT PK_DataHealth_Control PRIMARY KEY,
         Name                      nvarchar(200) NOT NULL,
@@ -41,7 +42,7 @@ IF OBJECT_ID(N'DataHealth.Control', N'U') IS NULL
         IsEnabled                 bit           NOT NULL
             CONSTRAINT DF_DataHealth_Control_IsEnabled DEFAULT (1),
         ApprovedSourceId          int           NOT NULL
-            CONSTRAINT FK_DataHealth_Control_ApprovedSource REFERENCES DataHealth.ApprovedSource (ApprovedSourceId),
+            CONSTRAINT FK_DataHealth_Control_ApprovedSource REFERENCES FileScan.DataHealthSource (ApprovedSourceId),
         OffsetDays                int           NOT NULL
             CONSTRAINT DF_DataHealth_Control_OffsetDays DEFAULT (2),
         OffsetType                nvarchar(20)  NOT NULL
@@ -71,12 +72,12 @@ IF OBJECT_ID(N'DataHealth.Control', N'U') IS NULL
     );
 GO
 
-IF OBJECT_ID(N'DataHealth.ControlAudit', N'U') IS NULL
-    CREATE TABLE DataHealth.ControlAudit (
+IF OBJECT_ID(N'FileScan.DataHealthControlAudit', N'U') IS NULL
+    CREATE TABLE FileScan.DataHealthControlAudit (
         AuditId     bigint        NOT NULL IDENTITY(1,1)
             CONSTRAINT PK_DataHealth_ControlAudit PRIMARY KEY,
         ControlId   int           NOT NULL
-            CONSTRAINT FK_DataHealth_ControlAudit_Control REFERENCES DataHealth.Control (ControlId),
+            CONSTRAINT FK_DataHealth_ControlAudit_Control REFERENCES FileScan.DataHealthControl (ControlId),
         ChangedAtUtc datetime2(3) NOT NULL
             CONSTRAINT DF_DataHealth_ControlAudit_ChangedAtUtc DEFAULT (SYSUTCDATETIME()),
         ChangedBy   nvarchar(256) NOT NULL,
@@ -87,13 +88,13 @@ IF OBJECT_ID(N'DataHealth.ControlAudit', N'U') IS NULL
 GO
 
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_DataHealth_ControlAudit_Control'
-               AND object_id = OBJECT_ID(N'DataHealth.ControlAudit'))
-    CREATE INDEX IX_DataHealth_ControlAudit_Control ON DataHealth.ControlAudit (ControlId, ChangedAtUtc);
+               AND object_id = OBJECT_ID(N'FileScan.DataHealthControlAudit'))
+    CREATE INDEX IX_DataHealth_ControlAudit_Control ON FileScan.DataHealthControlAudit (ControlId, ChangedAtUtc);
 GO
 
--- Result: expect the three tables in schema DataHealth.
+-- Result: expect the three DataHealth tables in schema FileScan.
 SELECT t.name AS TableName
 FROM sys.tables AS t JOIN sys.schemas AS s ON s.schema_id = t.schema_id
-WHERE s.name = N'DataHealth'
+WHERE s.name = N'FileScan' AND t.name LIKE N'DataHealth%'
 ORDER BY t.name;
 GO

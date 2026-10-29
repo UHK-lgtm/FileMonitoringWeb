@@ -13,7 +13,7 @@
 SET NOCOUNT ON;
 GO
 
-MERGE DataHealth.ApprovedSource AS target
+MERGE FileScan.DataHealthSource AS target
 -- The WHERE 1 = 0 keeps this template from inserting anything. Remove it, and add one row per source
 -- in the VALUES list (uncomment the example line and replace it), then run the script.
 USING (
