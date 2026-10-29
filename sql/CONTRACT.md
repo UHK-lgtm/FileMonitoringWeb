@@ -97,6 +97,13 @@ Created by `005_create_scan_run.sql`. One row per production run. Columns: `Scan
 
 The web app shows the latest run only, and never returns `FailureStage` or `FailureType`. The Function App writes the row, and a failure to write it is logged without stopping the scan.
 
+## Data Health grants (script 006)
+
+The web app reads the approved sources and the controls, and counts rows in each approved source. FileScan does not use these tables.
+
+- Web App user: `SELECT` on `DataHealth.ApprovedSource`, `DataHealth.Control` and `DataHealth.ControlAudit`. `INSERT` and `UPDATE` on `DataHealth.Control`. `INSERT` on `DataHealth.ControlAudit`.
+- Web App user, for every approved source: `SELECT` on that table or view. Grant these one by one, when an admin adds the source. The check runs against the catalog before any count, so a missing grant shows as an Error row, not a crash.
+
 ## Grants needed (not in the scripts)
 
 Scripts `002` and `005` do not grant permissions. Grant these before the first run, to the users the apps connect as.

@@ -218,6 +218,20 @@ The latest production scan run, and what it means for the "Last scan" line on To
 
 The failure stage and failure type are not returned. They are in the logs, for operators. If the run table cannot be read (for example before `sql/005` has been run), the response is `503` with the title `Scan status is unavailable.`
 
+## Data Health
+
+Record-count health checks against approved SQL sources (`docs/Data_Health_Basic_Specifications.md`). Reads run the approved checks. Writes change only the control configuration, and every change is audited. Statuses are `Missing`, `Decrease`, `Increase`, `Stable`, `NoHistory`, and `Error` (a check that could not run; never stored).
+
+- `GET /api/data-health`: the page. Returns `today`, `refreshedAtUtc`, the summary (`enabledSources`, `missingCount`, `decreaseCount`, `errorCount`, `healthy`) and one result per enabled control in display order. Each result has `controlDate`, `controlCount`, `comparisonDate`, `previousCount`, `percentChange`, `latestVisibleDate`, `latestVisibleCount`, `status`, `attention`, `message` and `trend` (one point per day in the window, zeros included). Cached for 30 seconds.
+- `GET /api/data-health/sources`: the approved sources the web app may count. Only an admin adds them (see `sql/006_seed_data_health_sources_TEMPLATE.sql`).
+- `GET /api/data-health/controls`, `GET /api/data-health/controls/{id}`: the configuration.
+- `POST /api/data-health/controls`: body `{ name, displayOrder, isEnabled, approvedSourceId, offsetDays, offsetType, historyDays, missingCheck, decreaseCheck, decreaseTolerancePercent }`. Returns 201 with the control. 400 with `errors` for a bad field or an unapproved source.
+- `PUT /api/data-health/controls/{id}`: the same body plus `concurrencyToken`. 409 when the control changed since it was read.
+- `POST /api/data-health/controls/{id}/enabled` (`{ isEnabled }`), `POST /api/data-health/controls/{id}/retire`: a retired control cannot be enabled.
+- `GET /api/data-health/controls/{id}/audit`: the audit trail, newest first.
+
+Ranges: `offsetDays` 0-60, `historyDays` 1-365, `decreaseTolerancePercent` 0-100, `displayOrder` 0 or more. `offsetType` is `CalendarDays` or `Weekdays`.
+
 ## Not in this version
 
 - Roles (Viewer and Admin). The spec defers them until configuration editing exists. Every signed-in user can edit.

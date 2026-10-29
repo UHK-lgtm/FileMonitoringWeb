@@ -23,6 +23,9 @@ Status values: `Open` (needs work), `Decided` (chosen, with a reason), `Fixed`, 
 | D-14 | Each imported flow: `BeginningTime` is the expected delivery time, and `EndTime` is the deadline (`BufferMinutes` = End − Begin). | The model has one expected time and a buffer, so the window maps onto them. | `sql/004_seed_production_flows.sql` |
 | D-15 | The 62 imported flows are inserted disabled. | Enabling them starts planning and scoring real folders. Enable only after the scanner reads `MatchType` and `DaysOfWeek`. | `sql/004_seed_production_flows.sql` |
 | D-16 | Imported flows use `Regex` matching, a whole-name match, with `NoDate`. | The flow list gives regular expressions, and the regexes already contain the date. | `sql/003_match_type_and_days.sql` |
+| D-17 | Data Health: a drop within the tolerance is Stable; beyond it, Decrease. A count of zero on the control date is Missing. | Matches the spec's wording, with the tolerance as the one configurable threshold. | `Server/DataHealth/DataHealthRules.cs` |
+| D-18 | Data Health: the latest visible date is searched only within the history window up to today. Results are cached for 30 seconds, and at most four checks run at once. | Keeps the source tables lightly loaded on repeated refreshes. | `Server/DataHealth/DataHealthService.cs` |
+| D-19 | Data Health: names used in SQL must match a strict pattern and exist in the catalog with a date type. Values are parameters. A failing check shows Error with a generic message. | Query safety: users never type SQL, and sources come only from the approved list. | `Server/Data/DataHealthRepository.cs` |
 | D-13 | The Today dashboard summarises the loaded day only. Charts over time are not built, because they need new API endpoints. | Keeps the release on the existing contract. | `ClientApp/src/screens/TodayScreen.tsx` |
 
 ## Known gaps (accepted for this release)
@@ -73,4 +76,5 @@ Add a row for each problem found during testing. Fix it here, then mark it `Fixe
 | ID | Found | Area | Symptom | Status | Fix |
 | --- | --- | --- | --- | --- | --- |
 | I-1 | | | | Open | |
+| I-3 | Build | Data Health | Built on `feature/data-health`: rules, schema 006, query runner, API, results and configuration pages. The approved source list is still needed before any real check can run. | Open | Send the source list (schema, table or view, date column), then seed it with the template and verify on the real database |
 | I-2 | Build | G-9, G-10 | Regex matching, weekday schedules and their web fields were built in code. | Built, verify after deploy | `sql/003` then deploy both apps; then enable one imported flow and check its first run |

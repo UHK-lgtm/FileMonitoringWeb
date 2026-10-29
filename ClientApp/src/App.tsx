@@ -4,15 +4,17 @@ import { auditExportUrl } from './api'
 import { ThemeToggle } from './components/ThemeToggle'
 import { ToastProvider } from './components/Toast'
 import { DefinitionsScreen } from './screens/DefinitionsScreen'
+import { DataHealthScreen } from './screens/DataHealthScreen'
 import { DeliveryDetailScreen } from './screens/DeliveryDetailScreen'
 import { TodayScreen } from './screens/TodayScreen'
 import { applyTheme, saveTheme, storedTheme, systemTheme, type Theme } from './theme'
 
-type Section = 'dashboard' | 'definitions'
+type Section = 'dashboard' | 'definitions' | 'health'
 
 const sectionTitles: Record<Section, string> = {
   dashboard: "Today's monitoring",
   definitions: 'Monitoring definitions',
+  health: 'Data Health',
 }
 
 function App() {
@@ -68,6 +70,14 @@ function App() {
             >
               Definitions
             </button>
+            <button
+              type="button"
+              className={section === 'health' ? 'tab on' : 'tab'}
+              aria-current={section === 'health' ? 'page' : undefined}
+              onClick={() => selectSection('health')}
+            >
+              Data Health
+            </button>
           </nav>
 
           <div className="topnav-actions">
@@ -90,6 +100,7 @@ function App() {
               <DeliveryDetailScreen expectedDeliveryId={openDeliveryId} onBack={() => setOpenDeliveryId(null)} />
             )}
             {section === 'definitions' && <DefinitionsScreen />}
+            {section === 'health' && <DataHealthScreen />}
           </main>
         </div>
       </div>

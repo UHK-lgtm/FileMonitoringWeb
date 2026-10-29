@@ -235,6 +235,84 @@ export const api = {
   getAudit: (id: number) => request<AuditEntry[]>('GET', `/monitoring-definitions/${id}/audit`),
 
   getLatestScanRun: () => request<LatestScanRunResponse>('GET', '/scan-runs/latest'),
+
+  getDataHealth: () => request<DataHealthResults>('GET', '/data-health'),
+  getDataHealthSources: () => request<ApprovedSource[]>('GET', '/data-health/sources'),
+  getDataHealthControls: () => request<DataHealthControl[]>('GET', '/data-health/controls'),
+  getDataHealthControl: (id: number) => request<DataHealthControl>('GET', `/data-health/controls/${id}`),
+  createDataHealthControl: (input: DataHealthControlInput) =>
+    request<DataHealthControl>('POST', '/data-health/controls', input),
+  updateDataHealthControl: (id: number, input: DataHealthControlInput, concurrencyToken: string) =>
+    request<DataHealthControl>('PUT', `/data-health/controls/${id}`, { ...input, concurrencyToken }),
+  setDataHealthControlEnabled: (id: number, isEnabled: boolean) =>
+    request<DataHealthControl>('POST', `/data-health/controls/${id}/enabled`, { isEnabled }),
+  retireDataHealthControl: (id: number) => request<DataHealthControl>('POST', `/data-health/controls/${id}/retire`),
+  getDataHealthControlAudit: (id: number) => request<AuditEntry[]>('GET', `/data-health/controls/${id}/audit`),
+}
+
+export type DataHealthStatus = 'Missing' | 'Decrease' | 'Increase' | 'Stable' | 'NoHistory' | 'Error'
+export type DataHealthOffsetType = 'CalendarDays' | 'Weekdays'
+
+export interface ApprovedSource {
+  id: number
+  sourceKey: string
+  displayName: string
+  schemaName: string
+  objectName: string
+  dateColumn: string
+}
+
+export interface DataHealthControl {
+  id: number
+  name: string
+  displayOrder: number
+  isEnabled: boolean
+  approvedSourceId: number
+  sourceKey: string
+  sourceName: string
+  offsetDays: number
+  offsetType: DataHealthOffsetType
+  historyDays: number
+  missingCheck: boolean
+  decreaseCheck: boolean
+  decreaseTolerancePercent: number
+  isRetired: boolean
+  concurrencyToken: string
+}
+
+export type DataHealthControlInput = Omit<DataHealthControl, 'id' | 'sourceKey' | 'sourceName' | 'isRetired' | 'concurrencyToken'>
+
+export interface TrendPoint {
+  date: string
+  count: number
+}
+
+export interface DataHealthControlResult {
+  controlId: number
+  name: string
+  sourceName: string
+  controlDate: string
+  controlCount: number
+  comparisonDate: string | null
+  previousCount: number | null
+  percentChange: number | null
+  latestVisibleDate: string | null
+  latestVisibleCount: number | null
+  status: DataHealthStatus
+  attention: boolean
+  message: string | null
+  trend: TrendPoint[]
+}
+
+export interface DataHealthResults {
+  today: string
+  refreshedAtUtc: string
+  enabledSources: number
+  missingCount: number
+  decreaseCount: number
+  errorCount: number
+  healthy: boolean
+  controls: DataHealthControlResult[]
 }
 
 export const auditExportUrl = '/api/export/audit.xlsx'
