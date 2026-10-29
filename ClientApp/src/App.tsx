@@ -1,10 +1,12 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import './App.css'
 import { auditExportUrl } from './api'
+import { ThemeToggle } from './components/ThemeToggle'
 import { ToastProvider } from './components/Toast'
 import { DefinitionsScreen } from './screens/DefinitionsScreen'
 import { DeliveryDetailScreen } from './screens/DeliveryDetailScreen'
 import { TodayScreen } from './screens/TodayScreen'
+import { applyTheme, saveTheme, storedTheme, systemTheme, type Theme } from './theme'
 
 type Section = 'dashboard' | 'definitions'
 
@@ -16,6 +18,17 @@ const sectionTitles: Record<Section, string> = {
 function App() {
   const [section, setSection] = useState<Section>('dashboard')
   const [openDeliveryId, setOpenDeliveryId] = useState<number | null>(null)
+  const [theme, setTheme] = useState<Theme>(() => storedTheme() ?? systemTheme())
+
+  useEffect(() => {
+    applyTheme(theme)
+  }, [theme])
+
+  function toggleTheme() {
+    const next: Theme = theme === 'light' ? 'dark' : 'light'
+    saveTheme(next)
+    setTheme(next)
+  }
 
   function selectSection(next: Section) {
     setSection(next)
@@ -66,9 +79,12 @@ function App() {
               <p className="eyebrow">File Monitoring</p>
               <h1>{title}</h1>
             </div>
-            <a className="button secondary" href={auditExportUrl}>
-              Export to Excel
-            </a>
+            <div className="topbar-actions">
+              <ThemeToggle theme={theme} onToggle={toggleTheme} />
+              <a className="button secondary" href={auditExportUrl}>
+                Export to Excel
+              </a>
+            </div>
           </header>
 
           <main className="page">

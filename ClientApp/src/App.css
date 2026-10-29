@@ -885,6 +885,36 @@ label {
   }
 }
 
+/* Top bar actions: theme toggle and export */
+.topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.theme-toggle {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border: 1px solid var(--c-border);
+  border-radius: 10px;
+  background: var(--c-surface);
+  color: var(--c-text);
+  cursor: pointer;
+  box-shadow: var(--c-shadow);
+}
+
+.theme-toggle:hover {
+  background: var(--c-surface-2);
+  border-color: var(--c-text-muted);
+}
+
+.theme-toggle:focus-visible {
+  outline: 3px solid var(--c-brand-ring);
+  outline-offset: 2px;
+}
+
 /* Dialog (used for editing a definition) */
 .modal-backdrop {
   position: fixed;

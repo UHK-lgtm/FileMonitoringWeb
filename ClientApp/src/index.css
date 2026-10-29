@@ -20,29 +20,9 @@
 
   color-scheme: light dark;
   font: 16px/1.45 var(--sans);
-  color: var(--text);
-  background: var(--bg);
+  color: var(--c-text);
+  background: var(--c-bg);
   -webkit-font-smoothing: antialiased;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --text: #c9ced8;
-    --text-muted: #9aa1b0;
-    --text-heading: #f3f4f6;
-    --bg: #14151b;
-    --surface: #1d1f27;
-    --border: #353846;
-    --accent: #7c93f5;
-    --accent-text: #0e1020;
-    --danger: #ff8a80;
-    --danger-bg: #3a1d1b;
-    --success: #6fd39a;
-    --success-bg: #1a3327;
-    --warning: #f5b65c;
-    --warning-bg: #3b2a14;
-    --muted-row: #6b7080;
-  }
 }
 
 * {
@@ -51,15 +31,15 @@
 
 body {
   margin: 0;
-  background: var(--bg);
-  color: var(--text);
+  background: var(--c-bg);
+  color: var(--c-text);
   overflow-x: hidden;
 }
 
 h1,
 h2,
 h3 {
-  color: var(--text-heading);
+  color: var(--c-text);
   font-weight: 600;
   line-height: 1.2;
 }
