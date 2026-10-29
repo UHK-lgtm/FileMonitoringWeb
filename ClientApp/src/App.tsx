@@ -40,7 +40,7 @@ function App() {
   return (
     <ToastProvider>
       <div className="app">
-        <aside className="sidebar">
+        <header className="topnav">
           <div className="brand">
             <span className="brand-mark">
               <img src="/generali-logo.png" alt="Generali" width="38" height="38" />
@@ -51,18 +51,18 @@ function App() {
             </span>
           </div>
 
-          <nav className="nav" aria-label="Sections">
+          <nav className="tabs" aria-label="Sections">
             <button
               type="button"
-              className={section === 'dashboard' ? 'nav-item active' : 'nav-item'}
+              className={section === 'dashboard' ? 'tab on' : 'tab'}
               aria-current={section === 'dashboard' ? 'page' : undefined}
               onClick={() => selectSection('dashboard')}
             >
-              Dashboard
+              Today
             </button>
             <button
               type="button"
-              className={section === 'definitions' ? 'nav-item active' : 'nav-item'}
+              className={section === 'definitions' ? 'tab on' : 'tab'}
               aria-current={section === 'definitions' ? 'page' : undefined}
               onClick={() => selectSection('definitions')}
             >
@@ -70,21 +70,18 @@ function App() {
             </button>
           </nav>
 
-          <div className="sidebar-foot">Business dates in Europe/Luxembourg</div>
-        </aside>
+          <div className="topnav-actions">
+            <ThemeToggle theme={theme} onToggle={toggleTheme} />
+            <a className="button secondary" href={auditExportUrl}>
+              Export to Excel
+            </a>
+          </div>
+        </header>
 
         <div className="main">
-          <header className="topbar">
-            <div>
-              <p className="eyebrow">File Monitoring</p>
-              <h1>{title}</h1>
-            </div>
-            <div className="topbar-actions">
-              <ThemeToggle theme={theme} onToggle={toggleTheme} />
-              <a className="button secondary" href={auditExportUrl}>
-                Export to Excel
-              </a>
-            </div>
+          <header className="page-head">
+            <p className="eyebrow">Business dates in Europe/Luxembourg</p>
+            <h1>{title}</h1>
           </header>
 
           <main className="page">

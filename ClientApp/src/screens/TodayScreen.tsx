@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { api, messagesFrom, type DeliveryStatus, type DeliverySummary } from '../api'
 import { ErrorList } from '../components/ErrorList'
-import { StatCard } from '../components/StatCard'
 import { ScanStatusLine } from '../components/ScanStatusLine'
 import { StatusBadge } from '../components/StatusBadge'
 import { formatDateTime, statusLabel, todayInLuxembourg } from '../format'
@@ -20,6 +19,7 @@ const statusColour: Record<DeliveryStatus, string> = {
   Missing: 'var(--c-missing)',
   Late: 'var(--c-late)',
 }
+const attentionOrder: DeliveryStatus[] = ['Missing', 'Incomplete', 'Late']
 
 export function TodayScreen({ onOpen }: TodayScreenProps) {
   const [date, setDate] = useState(todayInLuxembourg)
@@ -83,6 +83,13 @@ export function TodayScreen({ onOpen }: TodayScreenProps) {
     return { total, pending, onTimeRate, attention, openWarnings, nextDeadline }
   }, [items, counts, nowMs])
 
+  // Deliveries that need follow-up: missing first, then incomplete, then late.
+  const needsSecondLook = useMemo(
+    () =>
+      attentionOrder.flatMap((status) => items.filter((item) => item.status === status)).slice(0, 5),
+    [items],
+  )
+
   const visible = useMemo(() => {
     const term = search.trim().toLowerCase()
     return items.filter(
@@ -128,9 +135,9 @@ export function TodayScreen({ onOpen }: TodayScreenProps) {
       <ErrorList messages={errors} />
 
       {loading && (
-        <div className="kpis" aria-hidden="true">
-          {[0, 1, 2, 3, 4, 5].map((key) => (
-            <div key={key} className="kpi">
+        <div className="summary-strip" aria-hidden="true">
+          {[0, 1, 2, 3, 4].map((key) => (
+            <div key={key} className="summary-cell">
               <div className="skeleton" />
               <div className="skeleton" />
             </div>
@@ -140,149 +147,194 @@ export function TodayScreen({ onOpen }: TodayScreenProps) {
 
       {!loading && items.length > 0 && (
         <>
-          <div className="kpis">
-            <StatCard label="Expected today" value={summary.total} tone="neutral" hint="Scheduled deliveries" />
-            <StatCard
-              label="On time"
-              value={counts.OnTime}
-              tone="ok"
-              hint={summary.onTimeRate === null ? 'No decided deliveries yet' : `${summary.onTimeRate}% of decided`}
-            />
-            <StatCard label="Pending" value={counts.Pending} tone="pending" hint="Before their deadline" />
-            <StatCard
-              label="Needs attention"
-              value={summary.attention}
-              tone="attention"
-              hint={`${counts.Missing} missing · ${counts.Incomplete} incomplete · ${counts.Late} late`}
-            />
-            <StatCard label="Open warnings" value={summary.openWarnings} tone="warn" hint="Unexpected files" />
-            <StatCard
-              label="Next deadline"
-              value={summary.nextDeadline === null ? '—' : formatDateTime(summary.nextDeadline)}
-              tone="neutral"
-              hint="For a pending delivery"
-            />
-          </div>
+          <section className="summary-strip" aria-label="Summary">
+            <div className="summary-cell">
+              <span className="summary-label">Expected today</span>
+              <span className="summary-value">{summary.total}</span>
+              <span className="summary-hint">Scheduled deliveries</span>
+            </div>
+            <div className="summary-cell">
+              <span className="summary-label">On time</span>
+              <span className="summary-value ok">{counts.OnTime}</span>
+              <span className="summary-hint">
+                {summary.onTimeRate === null ? 'No decided deliveries yet' : `${summary.onTimeRate}% of decided`}
+              </span>
+            </div>
+            <div className="summary-cell">
+              <span className="summary-label">Pending</span>
+              <span className="summary-value pending">{counts.Pending}</span>
+              <span className="summary-hint">
+                {summary.nextDeadline === null ? 'Before their deadline' : `Next deadline ${formatDateTime(summary.nextDeadline)}`}
+              </span>
+            </div>
+            <div className="summary-cell">
+              <span className="summary-label">Needs attention</span>
+              <span className="summary-value attention">{summary.attention}</span>
+              <span className="summary-hint">
+                {counts.Missing} missing · {counts.Incomplete} incomplete · {counts.Late} late
+              </span>
+            </div>
+            <div className="summary-cell">
+              <span className="summary-label">Open warnings</span>
+              <span className="summary-value warn">{summary.openWarnings}</span>
+              <span className="summary-hint">Unexpected files</span>
+            </div>
+          </section>
 
-          <section className="card">
-            <h3>Status mix</h3>
-            <div className="distribution" role="img" aria-label="Deliveries by status">
-              {statusOrder
-                .filter((status) => counts[status] > 0)
-                .map((status) => (
-                  <span
+          <div className="today-grid">
+            <div className="today-side">
+              <section className="card">
+                <div className="card-head">
+                  <h3>Status mix</h3>
+                  <span className="muted small">{summary.total} deliveries</span>
+                </div>
+                <div className="distribution" role="img" aria-label="Deliveries by status">
+                  {statusOrder
+                    .filter((status) => counts[status] > 0)
+                    .map((status) => (
+                      <span
+                        key={status}
+                        title={`${statusLabel(status)}: ${counts[status]}`}
+                        style={{ width: `${(counts[status] / summary.total) * 100}%`, background: statusColour[status] }}
+                      />
+                    ))}
+                </div>
+                <ul className="mix-rows">
+                  {statusOrder.map((status) => (
+                    <li key={status}>
+                      <span>
+                        <span className="legend-dot" style={{ background: statusColour[status] }} />
+                        {statusLabel(status)}
+                      </span>
+                      <strong>{counts[status]}</strong>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+
+              <section className="card attention-card">
+                <h3>Needs a second look</h3>
+                {needsSecondLook.length === 0 ? (
+                  <p className="muted">Nothing needs follow-up right now.</p>
+                ) : (
+                  <ul className="attention-list">
+                    {needsSecondLook.map((item) => (
+                      <li key={item.expectedDeliveryId}>
+                        <button type="button" className="link-button" onClick={() => onOpen(item.expectedDeliveryId)}>
+                          {item.definitionName}
+                        </button>
+                        <span className="muted small">
+                          {statusLabel(item.status).toLowerCase()} · {item.receivedFileCount} of {item.expectedFileCount}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </section>
+            </div>
+
+            <section className="card deliveries-card">
+              <div className="card-head">
+                <h3>Deliveries</h3>
+                <span className="muted small">Sorted by deadline · {visible.length} of {items.length} shown</span>
+              </div>
+
+              <div className="filters">
+                <button type="button" className={filter === 'All' ? 'chip active' : 'chip'} onClick={() => setFilter('All')}>
+                  All <span>{items.length}</span>
+                </button>
+                {statusOrder.map((status) => (
+                  <button
                     key={status}
-                    title={`${statusLabel(status)}: ${counts[status]}`}
-                    style={{ width: `${(counts[status] / summary.total) * 100}%`, background: statusColour[status] }}
-                  />
+                    type="button"
+                    className={filter === status ? 'chip active' : 'chip'}
+                    onClick={() => setFilter(status)}
+                  >
+                    {statusLabel(status)} <span>{counts[status]}</span>
+                  </button>
                 ))}
-            </div>
-            <div className="legend">
-              {statusOrder.map((status) => (
-                <span key={status}>
-                  <span className="legend-dot" style={{ background: statusColour[status] }} />
-                  {statusLabel(status)} <strong>{counts[status]}</strong>
-                </span>
-              ))}
-            </div>
-          </section>
-
-          <div className="filters">
-            <button type="button" className={filter === 'All' ? 'chip active' : 'chip'} onClick={() => setFilter('All')}>
-              All <span>{items.length}</span>
-            </button>
-            {statusOrder.map((status) => (
-              <button
-                key={status}
-                type="button"
-                className={filter === status ? 'chip active' : 'chip'}
-                onClick={() => setFilter(status)}
-              >
-                {statusLabel(status)} <span>{counts[status]}</span>
-              </button>
-            ))}
-            <input
-              className="search"
-              type="search"
-              placeholder="Search definitions"
-              aria-label="Search definitions"
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-            />
-          </div>
-
-          <section className="card">
-            {visible.length === 0 ? (
-              <div className="empty">
-                <strong>No deliveries match</strong>
-                <span>Try another status or clear the search.</span>
+                <input
+                  className="search"
+                  type="search"
+                  placeholder="Search definitions"
+                  aria-label="Search definitions"
+                  value={search}
+                  onChange={(event) => setSearch(event.target.value)}
+                />
               </div>
-            ) : (
-              <div className="table-wrap">
-                <table>
-                  <thead>
-                    <tr>
-                      <th>Definition</th>
-                      <th>Status</th>
-                      <th>Received</th>
-                      <th>Deadline</th>
-                      <th>Completed</th>
-                      <th>Unexpected</th>
-                      <th>Warnings</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {visible.map((item) => {
-                      const percent =
-                        item.expectedFileCount === 0
-                          ? 0
-                          : Math.min(100, Math.round((item.receivedFileCount / item.expectedFileCount) * 100))
-                      return (
-                        <tr key={item.expectedDeliveryId} className="clickable" onClick={() => onOpen(item.expectedDeliveryId)}>
-                          <td>
-                            <button
-                              type="button"
-                              className="link-button"
-                              onClick={(event) => {
-                                event.stopPropagation()
-                                onOpen(item.expectedDeliveryId)
-                              }}
-                            >
-                              {item.definitionName}
-                            </button>
-                            <div className="muted small">{item.expectedDate}</div>
-                          </td>
-                          <td>
-                            <StatusBadge status={item.status} />
-                          </td>
-                          <td>
-                            <div className="progress-cell">
-                              <span>
-                                {item.receivedFileCount} / {item.expectedFileCount}
-                              </span>
-                              <div className="progress" aria-hidden="true">
-                                <span style={{ width: `${percent}%`, background: statusColour[item.status] }} />
+
+              {visible.length === 0 ? (
+                <div className="empty">
+                  <strong>No deliveries match</strong>
+                  <span>Try another status or clear the search.</span>
+                </div>
+              ) : (
+                <div className="table-wrap">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Definition</th>
+                        <th>Status</th>
+                        <th>Received</th>
+                        <th>Deadline</th>
+                        <th>Completed</th>
+                        <th>Unexpected</th>
+                        <th>Warnings</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {visible.map((item) => {
+                        const percent =
+                          item.expectedFileCount === 0
+                            ? 0
+                            : Math.min(100, Math.round((item.receivedFileCount / item.expectedFileCount) * 100))
+                        return (
+                          <tr key={item.expectedDeliveryId} className="clickable" onClick={() => onOpen(item.expectedDeliveryId)}>
+                            <td>
+                              <button
+                                type="button"
+                                className="link-button"
+                                onClick={(event) => {
+                                  event.stopPropagation()
+                                  onOpen(item.expectedDeliveryId)
+                                }}
+                              >
+                                {item.definitionName}
+                              </button>
+                              <div className="muted small">{item.expectedDate}</div>
+                            </td>
+                            <td>
+                              <StatusBadge status={item.status} />
+                            </td>
+                            <td>
+                              <div className="progress-cell">
+                                <span>
+                                  {item.receivedFileCount} / {item.expectedFileCount}
+                                </span>
+                                <div className="progress" aria-hidden="true">
+                                  <span style={{ width: `${percent}%`, background: statusColour[item.status] }} />
+                                </div>
                               </div>
-                            </div>
-                          </td>
-                          <td>{formatDateTime(item.deadlineUtc)}</td>
-                          <td>{formatDateTime(item.completedAtUtc)}</td>
-                          <td>{item.unexpectedFileCount}</td>
-                          <td>
-                            {item.warningCount > 0 ? (
-                              <span className="pill pill-off">{item.warningCount} open</span>
-                            ) : (
-                              <span className="muted">None</span>
-                            )}
-                          </td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </section>
+                            </td>
+                            <td>{formatDateTime(item.deadlineUtc)}</td>
+                            <td>{formatDateTime(item.completedAtUtc)}</td>
+                            <td>{item.unexpectedFileCount}</td>
+                            <td>
+                              {item.warningCount > 0 ? (
+                                <span className="pill pill-off">{item.warningCount} open</span>
+                              ) : (
+                                <span className="muted">None</span>
+                              )}
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </section>
+          </div>
         </>
       )}
 

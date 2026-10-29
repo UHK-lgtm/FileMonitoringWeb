@@ -32,12 +32,13 @@
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']) {
-    --c-bg: #0c0f14;
-    --c-surface: #151a22;
-    --c-surface-2: #1b212b;
-    --c-border: #2a3140;
-    --c-text: #e7eaf0;
-    --c-text-muted: #9aa3b2;
+    --c-brand: #e0302a;
+    --c-bg: #0b0f17;
+    --c-surface: #121826;
+    --c-surface-2: #171f2f;
+    --c-border: #243047;
+    --c-text: #e7ecf4;
+    --c-text-muted: #8c97ab;
     --c-shadow: none;
     --c-brand-soft: #3a0f18;
     --c-ok-bg: #0f2a1d;
@@ -45,16 +46,22 @@
     --c-missing-bg: #3a1513;
     --c-incomplete-bg: #3a2a10;
     --c-late-bg: #251a40;
+    --c-ok: #4ade80;
+    --c-pending: #93c5fd;
+    --c-missing: #fca5a5;
+    --c-incomplete: #fcd34d;
+    --c-late: #c4b5fd;
   }
 }
 
 :root[data-theme='dark'] {
-  --c-bg: #0c0f14;
-  --c-surface: #151a22;
-  --c-surface-2: #1b212b;
-  --c-border: #2a3140;
-  --c-text: #e7eaf0;
-  --c-text-muted: #9aa3b2;
+  --c-brand: #e0302a;
+  --c-bg: #0b0f17;
+  --c-surface: #121826;
+  --c-surface-2: #171f2f;
+  --c-border: #243047;
+  --c-text: #e7ecf4;
+  --c-text-muted: #8c97ab;
   --c-shadow: none;
   --c-brand-soft: #3a0f18;
   --c-ok-bg: #0f2a1d;
@@ -62,15 +69,253 @@
   --c-missing-bg: #3a1513;
   --c-incomplete-bg: #3a2a10;
   --c-late-bg: #251a40;
+  --c-ok: #4ade80;
+  --c-pending: #93c5fd;
+  --c-missing: #fca5a5;
+  --c-incomplete: #fcd34d;
+  --c-late: #c4b5fd;
 }
 
 /* Layout */
 .app {
-  display: grid;
-  grid-template-columns: 248px minmax(0, 1fr);
   min-height: 100vh;
   color: var(--c-text);
   font-family: var(--c-sans);
+}
+
+/* Top navigation: brand, section tabs, theme toggle and export */
+.topnav {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 32px;
+  background: var(--c-surface);
+  border-bottom: 1px solid var(--c-border);
+}
+
+.topnav .brand {
+  color: var(--c-text);
+}
+
+.topnav .brand-mark {
+  box-shadow: none;
+}
+
+.tabs {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--c-border);
+  border-radius: 12px;
+  background: var(--c-surface-2);
+}
+
+.tab {
+  padding: 8px 18px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--c-text-muted);
+  font: inherit;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.tab:hover {
+  color: var(--c-text);
+}
+
+.tab.on {
+  background: var(--c-brand);
+  color: #fff;
+  font-weight: 600;
+  box-shadow: 0 6px 16px rgba(194, 27, 23, 0.3);
+}
+
+.tab:focus-visible {
+  outline: 3px solid var(--c-brand-ring);
+  outline-offset: 2px;
+}
+
+.topnav-actions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 10px;
+}
+
+.page-head {
+  padding: 24px 32px 0;
+}
+
+.page-head h1 {
+  margin: 4px 0 0;
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 32px;
+  font-weight: 400;
+  letter-spacing: -0.01em;
+}
+
+/* Summary strip: one bordered bar with five figures, as in the design */
+.summary-strip {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  margin-bottom: 18px;
+  border: 1px solid var(--c-border);
+  border-radius: 16px;
+  background: var(--c-surface);
+  box-shadow: var(--c-shadow);
+  overflow: hidden;
+}
+
+.summary-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 16px 20px;
+  border-left: 1px solid var(--c-border);
+  min-width: 0;
+}
+
+.summary-cell:first-child {
+  border-left: 0;
+}
+
+.summary-label {
+  color: var(--c-text-muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.summary-value {
+  font-size: 30px;
+  font-weight: 700;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+}
+
+.summary-value.ok {
+  color: var(--c-ok);
+}
+
+.summary-value.pending {
+  color: var(--c-pending);
+}
+
+.summary-value.attention {
+  color: var(--c-missing);
+}
+
+.summary-value.warn {
+  color: var(--c-incomplete);
+}
+
+.summary-hint {
+  color: var(--c-text-muted);
+  font-size: 12px;
+}
+
+/* Today layout: side column and deliveries table */
+.today-grid {
+  display: grid;
+  grid-template-columns: minmax(260px, 0.7fr) minmax(0, 2.3fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.today-side {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.today-side .card,
+.deliveries-card {
+  margin-bottom: 0;
+}
+
+/* Dates and times stay on one line; the definition name may wrap. */
+.deliveries-card td:nth-child(n + 4) {
+  white-space: nowrap;
+}
+
+.card-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.card-head h3 {
+  margin: 0;
+}
+
+.mix-rows {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+}
+
+.mix-rows li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 11px 0;
+  border-bottom: 1px solid var(--c-border);
+  color: var(--c-text-muted);
+}
+
+.mix-rows li strong {
+  color: var(--c-text);
+  font-size: 15px;
+}
+
+.attention-card {
+  border-color: var(--c-missing-bg);
+  background: linear-gradient(160deg, var(--c-missing-bg), var(--c-surface) 70%);
+}
+
+.attention-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.attention-list li {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 0;
+  border-bottom: 1px dashed var(--c-border);
+}
+
+.attention-list li:last-child {
+  border-bottom: 0;
+}
+
+@media (max-width: 1100px) {
+  .summary-strip {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .summary-cell:nth-child(odd) {
+    border-left: 0;
+  }
+
+  .today-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .today-grid > * {
+    min-width: 0;
+  }
 }
 
 .sidebar {
@@ -193,7 +438,7 @@
 }
 
 .page {
-  max-width: 1320px;
+  max-width: none;
   padding: 24px 32px 48px;
 }
 
@@ -885,6 +1130,12 @@ label {
   }
 }
 
+/* Form groups use the theme border instead of the browser's default outline */
+fieldset {
+  border: 1px solid var(--c-border);
+  border-radius: 10px;
+}
+
 /* Top bar actions: theme toggle and export */
 .topbar-actions {
   display: flex;
@@ -1042,8 +1293,39 @@ label {
 
 /* Responsive */
 @media (max-width: 860px) {
-  .app {
+  .topnav {
     grid-template-columns: 1fr;
+    gap: 12px;
+    padding: 12px 16px;
+  }
+
+  .tabs {
+    width: 100%;
+  }
+
+  .tab {
+    flex: 1;
+  }
+
+  .topnav-actions {
+    justify-content: space-between;
+  }
+
+  .page-head {
+    padding: 18px 16px 0;
+  }
+
+  .summary-strip {
+    grid-template-columns: 1fr;
+  }
+
+  .summary-cell {
+    border-left: 0;
+    border-top: 1px solid var(--c-border);
+  }
+
+  .summary-cell:first-child {
+    border-top: 0;
   }
 
   .sidebar {
