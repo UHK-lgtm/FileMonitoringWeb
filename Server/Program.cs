@@ -7,6 +7,9 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddSingleton<MonitoringDefinitionRepository>();
 builder.Services.AddSingleton<DeliveryRepository>();
 builder.Services.AddSingleton<ScanRunRepository>();
+builder.Services.AddSingleton<FileMonitoringWeb.Server.Data.DataHealthRepository>();
+builder.Services.AddSingleton<FileMonitoringWeb.Server.DataHealth.DataHealthService>();
+builder.Services.AddMemoryCache();
 
 var app = builder.Build();
 
@@ -27,6 +30,7 @@ app.MapDefinitionEndpoints();
 app.MapDeliveryEndpoints();
 app.MapExportEndpoints();
 app.MapScanRunEndpoints();
+app.MapDataHealthEndpoints();
 
 // Unknown API routes return 404 instead of the React index page.
 app.MapGet("/api/{**path}", () => Results.NotFound());

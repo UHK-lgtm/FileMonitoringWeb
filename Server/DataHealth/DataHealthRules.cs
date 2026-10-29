@@ -64,6 +64,18 @@ public static class DataHealthRules
         return ControlStatus.Stable;
     }
 
+    /// The comparison date: the latest day before the control date that has data. Null when there is none.
+    public static DateOnly? PreviousAvailableDate(DateOnly controlDate, IReadOnlyDictionary<DateOnly, int> countsByDay) =>
+        countsByDay
+            .Where(entry => entry.Key < controlDate && entry.Value > 0)
+            .Select(entry => (DateOnly?)entry.Key)
+            .Max();
+
+    /// A table, view or column name that is safe to place in SQL: letters, digits and underscores, starting with a letter or underscore.
+    /// Names are also checked against the database catalog before use. Values are never built into SQL text.
+    public static bool IsSafeIdentifier(string? name) =>
+        name is not null && System.Text.RegularExpressions.Regex.IsMatch(name, "^[A-Za-z_][A-Za-z0-9_]{0,127}$");
+
     /// Only Missing and Decrease are attention conditions. A check that is switched off does not raise attention.
     public static bool IsAttention(ControlStatus status, bool missingCheck, bool decreaseCheck) =>
         status switch
