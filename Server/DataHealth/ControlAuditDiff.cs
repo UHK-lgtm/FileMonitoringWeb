@@ -18,6 +18,8 @@ public static class ControlAuditDiff
         ("missingCheck", c => c.MissingCheck),
         ("decreaseCheck", c => c.DecreaseCheck),
         ("decreaseTolerancePercent", c => c.DecreaseTolerancePercent),
+        ("dateColumnType", c => c.DateColumnType),
+        ("dateStyles", c => c.DateStyles),
         ("isRetired", c => c.IsRetired),
     ];
 

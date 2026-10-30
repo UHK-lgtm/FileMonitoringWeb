@@ -248,9 +248,6 @@ export const api = {
     request<DataHealthControl>('POST', `/data-health/controls/${id}/enabled`, { isEnabled }),
   retireDataHealthControl: (id: number) => request<DataHealthControl>('POST', `/data-health/controls/${id}/retire`),
   getDataHealthControlAudit: (id: number) => request<AuditEntry[]>('GET', `/data-health/controls/${id}/audit`),
-  updateDataHealthSourceFormat: (id: number, input: DataHealthSourceFormatInput) =>
-    request<ApprovedSource>('PUT', `/data-health/sources/${id}/format`, input),
-  getDataHealthSourceAudit: (id: number) => request<AuditEntry[]>('GET', `/data-health/sources/${id}/audit`),
 }
 
 export type DataHealthStatus = 'Missing' | 'Decrease' | 'Increase' | 'Stable' | 'NoHistory' | 'Error'
@@ -263,16 +260,6 @@ export interface ApprovedSource {
   schemaName: string
   objectName: string
   dateColumn: string
-  dateColumnType: string
-  // Comma-separated convert styles in the order they are tried, for text columns only. Null for date columns.
-  dateStyles: string | null
-  concurrencyToken: string
-}
-
-export interface DataHealthSourceFormatInput {
-  dateColumnType: string
-  dateStyles: string | null
-  concurrencyToken: string
 }
 
 export interface DataHealthControl {
@@ -289,6 +276,10 @@ export interface DataHealthControl {
   missingCheck: boolean
   decreaseCheck: boolean
   decreaseTolerancePercent: number
+  // How the source's date column is stored: a real date type, or a text type read with the styles below.
+  dateColumnType: string
+  // Comma-separated convert styles in the order they are tried, for text columns only. Null for date columns.
+  dateStyles: string | null
   isRetired: boolean
   concurrencyToken: string
 }

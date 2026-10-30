@@ -60,6 +60,14 @@ public class DataHealthSafetyTests
     }
 
     [Fact]
+    public void Stored_style_list_is_normalised_for_text_types_only()
+    {
+        Assert.Equal("112,23", DataHealthRules.NormalizeStyles("varchar", "112,23"));
+        Assert.Null(DataHealthRules.NormalizeStyles("date", "112"));
+        Assert.Null(DataHealthRules.NormalizeStyles("varchar", "112,112"));
+    }
+
+    [Fact]
     public void Text_count_tries_each_style_in_order_and_quotes_the_names()
     {
         var sql = DataHealthSql.CountText("FileScan", "Trade Feed", "Trade Date", new[] { 112, 23 });
@@ -88,23 +96,23 @@ public class DataHealthSafetyTests
     }
 
     [Fact]
-    public void Source_format_accepts_text_with_styles_and_date_without()
+    public void Format_accepts_text_with_styles_and_date_without()
     {
-        Assert.Empty(DataHealthValidator.ValidateSourceFormat(new DataHealthSourceFormatInput("varchar", "112", null)));
-        Assert.Empty(DataHealthValidator.ValidateSourceFormat(new DataHealthSourceFormatInput("datetime2", null, null)));
+        Assert.Empty(DataHealthValidator.ValidateFormat("varchar", "112"));
+        Assert.Empty(DataHealthValidator.ValidateFormat("datetime2", null));
     }
 
     [Fact]
-    public void Source_format_rejects_text_without_styles_and_styles_on_a_date()
+    public void Format_rejects_text_without_styles_and_styles_on_a_date()
     {
-        Assert.NotEmpty(DataHealthValidator.ValidateSourceFormat(new DataHealthSourceFormatInput("varchar", null, null)));
-        Assert.NotEmpty(DataHealthValidator.ValidateSourceFormat(new DataHealthSourceFormatInput("date", "112", null)));
+        Assert.NotEmpty(DataHealthValidator.ValidateFormat("varchar", null));
+        Assert.NotEmpty(DataHealthValidator.ValidateFormat("date", "112"));
     }
 
     [Fact]
-    public void Source_format_rejects_an_unknown_column_type()
+    public void Format_rejects_an_unknown_column_type()
     {
-        Assert.NotEmpty(DataHealthValidator.ValidateSourceFormat(new DataHealthSourceFormatInput("money", null, null)));
+        Assert.NotEmpty(DataHealthValidator.ValidateFormat("money", null));
     }
 
     [Fact]
@@ -143,6 +151,14 @@ public class DataHealthSafetyTests
     }
 
     [Fact]
+    public void Validator_rejects_a_bad_format_on_the_control()
+    {
+        var errors = DataHealthValidator.Validate(Input() with { DateColumnType = "varchar", DateStyles = null });
+
+        Assert.Single(errors);
+    }
+
+    [Fact]
     public void Audit_records_only_changed_control_fields()
     {
         var before = Control();
@@ -156,6 +172,19 @@ public class DataHealthSafetyTests
         Assert.Contains(changes, c => c.FieldName == "approvedSourceId" && c.NewValue == "7");
     }
 
+    [Fact]
+    public void Audit_records_a_change_of_format_on_the_control()
+    {
+        var before = Control();
+        var after = before with { DateColumnType = "varchar", DateStyles = "112" };
+
+        var changes = ControlAuditDiff.Diff(before, after);
+
+        Assert.Equal(2, changes.Count);
+        Assert.Contains(changes, c => c.FieldName == "dateColumnType" && c.OldValue == "date" && c.NewValue == "varchar");
+        Assert.Contains(changes, c => c.FieldName == "dateStyles" && c.OldValue == null && c.NewValue == "112");
+    }
+
     private static DataHealthControlInput Input() =>
         new(Name: "Positions received",
             DisplayOrder: 1,
@@ -167,6 +196,8 @@ public class DataHealthSafetyTests
             MissingCheck: true,
             DecreaseCheck: true,
             DecreaseTolerancePercent: 0,
+            DateColumnType: "date",
+            DateStyles: null,
             ConcurrencyToken: null);
 
     private static DataHealthControlDto Control() =>
@@ -183,6 +214,8 @@ public class DataHealthSafetyTests
             MissingCheck: true,
             DecreaseCheck: true,
             DecreaseTolerancePercent: 0,
+            DateColumnType: "date",
+            DateStyles: null,
             IsRetired: false,
             ConcurrencyToken: "AAAAAAAAB9E=");
 }

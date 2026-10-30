@@ -1,22 +1,14 @@
 namespace FileMonitoringWeb.Server.DataHealth;
 
 /// An approved source the web app may count. The list is maintained by an admin script; the web app only reads it.
+/// The date format is not here: each control holds its own format.
 public sealed record ApprovedSourceDto(
     int Id,
     string SourceKey,
     string DisplayName,
     string SchemaName,
     string ObjectName,
-    string DateColumn,
-    string DateColumnType,
-    string? DateStyles,
-    string ConcurrencyToken);
-
-/// The body of PUT for a source's date format. Only the format can be changed from the web app.
-public sealed record DataHealthSourceFormatInput(
-    string? DateColumnType,
-    string? DateStyles,
-    string? ConcurrencyToken);
+    string DateColumn);
 
 /// One Data Health control, as returned by the configuration endpoints.
 public sealed record DataHealthControlDto(
@@ -33,10 +25,14 @@ public sealed record DataHealthControlDto(
     bool MissingCheck,
     bool DecreaseCheck,
     decimal DecreaseTolerancePercent,
+    string DateColumnType,
+    string? DateStyles,
     bool IsRetired,
     string ConcurrencyToken);
 
 /// The body of POST and PUT for a control. The server sets the Id, retirement and the audit values.
+/// DateColumnType and DateStyles describe how the source's date column is stored: a real date type, or a text type
+/// with an ordered list of convert styles (for example 112 for yyyyMMdd).
 public sealed record DataHealthControlInput(
     string? Name,
     int DisplayOrder,
@@ -48,6 +44,8 @@ public sealed record DataHealthControlInput(
     bool MissingCheck,
     bool DecreaseCheck,
     decimal DecreaseTolerancePercent,
+    string? DateColumnType,
+    string? DateStyles,
     string? ConcurrencyToken);
 
 /// One day in a control's trend: the record count for that day.

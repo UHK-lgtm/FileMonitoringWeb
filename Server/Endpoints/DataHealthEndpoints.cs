@@ -18,34 +18,7 @@ public static class DataHealthEndpoints
         group.MapGet("sources", async (DataHealthRepository repository, CancellationToken cancellationToken) =>
             Results.Ok(await repository.ListSourcesAsync(cancellationToken)));
 
-        group.MapPut("sources/{id:int}/format", async (int id, DataHealthSourceFormatInput input, HttpContext context, DataHealthRepository repository, CancellationToken cancellationToken) =>
-        {
-            if (CurrentUser.Get(context) is not { } user)
-                return Results.Unauthorized();
-
-            var errors = DataHealthValidator.ValidateSourceFormat(input);
-            if (errors.Count > 0)
-                return Results.BadRequest(new { errors });
-
-            var outcome = await repository.UpdateSourceFormatAsync(id, input, user, cancellationToken);
-            return outcome switch
-            {
-                SaveOutcome.Saved => Results.Ok((await repository.GetSourceAsync(id, cancellationToken))),
-                SaveOutcome.NotFound => Results.NotFound(),
-                SaveOutcome.Conflict => Results.Conflict(new { message = "This source changed since you opened it. Reload it and try again." }),
-                _ => Results.BadRequest(new { errors = new[] { "The date format cannot be saved in its current state." } }),
-            };
-        });
-
-        group.MapGet("sources/{id:int}/audit", async (int id, DataHealthRepository repository, CancellationToken cancellationToken) =>
-        {
-            if (await repository.GetSourceAsync(id, cancellationToken) is null)
-                return Results.NotFound();
-
-            return Results.Ok(await repository.SourceAuditForAsync(id, cancellationToken));
-        });
-
-        group.MapGet("controls", async (DataHealthRepository repository, CancellationToken cancellationToken) =>
+        group.MapGet("controls",async (DataHealthRepository repository, CancellationToken cancellationToken) =>
             Results.Ok(await repository.ListControlsAsync(cancellationToken)));
 
         group.MapGet("controls/{id:int}", async (int id, DataHealthRepository repository, CancellationToken cancellationToken) =>

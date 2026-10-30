@@ -31,26 +31,28 @@ public static class DataHealthValidator
         if (input.DecreaseTolerancePercent is < 0 or > 100)
             errors.Add("decreaseTolerancePercent must be between 0 and 100.");
 
+        errors.AddRange(ValidateFormat(input.DateColumnType, input.DateStyles));
+
         return errors;
     }
 
-    /// The stored type must be a supported date or text type. Text types need an ordered style list; date types must not have one.
-    public static IReadOnlyList<string> ValidateSourceFormat(DataHealthSourceFormatInput input)
+    /// The column type must be a supported date or text type. Text types need an ordered style list; date types must not have one.
+    public static IReadOnlyList<string> ValidateFormat(string? dateColumnType, string? dateStyles)
     {
         var errors = new List<string>();
 
-        if (!DataHealthRules.IsAllowedColumnType(input.DateColumnType))
+        if (!DataHealthRules.IsAllowedColumnType(dateColumnType))
         {
             errors.Add("dateColumnType must be one of date, datetime, datetime2, smalldatetime, datetimeoffset, varchar, nvarchar, char or nchar.");
             return errors;
         }
 
-        if (DataHealthRules.IsTextType(input.DateColumnType))
+        if (DataHealthRules.IsTextType(dateColumnType))
         {
-            if (DataHealthRules.ParseStyles(input.DateStyles) is null)
+            if (DataHealthRules.ParseStyles(dateStyles) is null)
                 errors.Add("dateStyles must list one or more allowed styles in order, for example 112 or 112,23. Each style may appear once.");
         }
-        else if (!string.IsNullOrWhiteSpace(input.DateStyles))
+        else if (!string.IsNullOrWhiteSpace(dateStyles))
         {
             errors.Add("dateStyles must be empty for a real date column.");
         }

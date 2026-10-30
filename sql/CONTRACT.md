@@ -102,7 +102,8 @@ The web app shows the latest run only, and never returns `FailureStage` or `Fail
 The web app reads the approved sources and the controls, and counts rows in each approved source. FileScan does not use these tables.
 
 - Web App user: `SELECT` on `FileScan.DataHealthSource`, `FileScan.DataHealthControl` and `FileScan.DataHealthControlAudit`. `INSERT` and `UPDATE` on `FileScan.DataHealthControl`. `INSERT` on `FileScan.DataHealthControlAudit`.
-- Web App user, script 008: `UPDATE` on `FileScan.DataHealthSource` for the `DateColumnType` and `DateStyles` columns only (the web app cannot change the names or add sources). `SELECT` and `INSERT` on `FileScan.DataHealthSourceAudit`. `SELECT` on `FileScan.DataHealthSource` already covers `ConcurrencyToken`.
+- Script 009: `FileScan.DataHealthControl` has `DateColumnType` and `DateStyles`. The Web App's existing `INSERT` and `UPDATE` on `FileScan.DataHealthControl` cover them, so no new grant is needed.
+- Script 008 (superseded by 009): the web app no longer reads or writes `FileScan.DataHealthSource.DateColumnType`, `DateStyles` or `ConcurrencyToken`, and does not use `FileScan.DataHealthSourceAudit`. Those objects stay until a later script drops them. The web app needs no grant on them.
 - Web App user, for every approved source: `SELECT` on that table or view. Grant these one by one, when an admin adds the source. The check runs against the catalog before any count, so a missing grant shows as an Error row, not a crash.
 
 ## Grants needed (not in the scripts)

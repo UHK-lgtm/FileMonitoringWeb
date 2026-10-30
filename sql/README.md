@@ -14,7 +14,8 @@ Schema for the File Monitoring solution, shared by this web app and the FileScan
 | `006_create_data_health.sql` | Creates the Data Health tables `FileScan.DataHealthSource`, `FileScan.DataHealthControl` and `FileScan.DataHealthControlAudit`. |
 | `006_seed_data_health_sources_TEMPLATE.sql` | Template for the approved Data Health sources. Copy it, fill in the rows, and run the copy once. It inserts nothing as it is. |
 | `007_text_date_sources.sql` | Adds `DateColumnType` and `DateStyles` to `DataHealthSource`, so a text date column can be counted. Requires 006. |
-| `008_data_health_source_format_audit.sql` | Adds `ConcurrencyToken` to `DataHealthSource` and creates `DataHealthSourceAudit`, so the web app can change a source's date format with an audit trail. Requires 007. |
+| `008_data_health_source_format_audit.sql` | Adds `ConcurrencyToken` to `DataHealthSource` and creates `DataHealthSourceAudit`. Superseded by 009 for the format; the web app no longer uses these. Requires 007. |
+| `009_data_health_control_format.sql` | Adds `DateColumnType` and `DateStyles` to `DataHealthControl`, and copies each control's format from its source. The format now belongs to the control. Requires 007 and 008. |
 
 ## What to run now
 
@@ -25,7 +26,7 @@ Run these in order against the shared database. Skip any you have already run; `
 
 Deploy the web app and the FileScan Function App after `003`, before enabling any imported flow.
 
-For Data Health with text date columns, run `007_text_date_sources.sql` and then `008_data_health_source_format_audit.sql`, after `006`. Then run your filled-in approved-source script, which sets `DateColumnType` and `DateStyles` for each source.
+For Data Health with text date columns, run `007_text_date_sources.sql`, then `008_data_health_source_format_audit.sql`, then `009_data_health_control_format.sql`, all after `006`. Then run your filled-in approved-source script. The date format is set on each control in the web app.
 
 ## Running a script
 

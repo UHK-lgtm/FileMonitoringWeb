@@ -112,6 +112,11 @@ public static class DataHealthRules
         return styles;
     }
 
+    /// The stored form of a control's style list: the numbers in order, with no spaces. Null for a date type, and null for
+    /// a text type whose list is not valid.
+    public static string? NormalizeStyles(string? dateColumnType, string? value) =>
+        IsTextType(dateColumnType) && ParseStyles(value) is { } styles ? string.Join(",", styles) : null;
+
     /// A table, view, schema or column name as it appears in the catalog. Spaces and punctuation are allowed, because the
     /// name is always quoted, and the catalog check must find the exact name before anything runs.
     public static bool IsValidName(string? name) =>

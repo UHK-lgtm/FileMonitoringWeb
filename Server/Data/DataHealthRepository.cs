@@ -37,7 +37,7 @@ public sealed class DataHealthRepository(IConfiguration configuration)
     private const string ControlColumns = """
         c.ControlId, c.Name, c.DisplayOrder, c.IsEnabled, c.ApprovedSourceId, s.SourceKey, s.DisplayName,
         c.OffsetDays, c.OffsetType, c.HistoryDays, c.MissingCheck, c.DecreaseCheck, c.DecreaseTolerancePercent,
-        c.IsRetired, c.ConcurrencyToken
+        c.DateColumnType, c.DateStyles, c.IsRetired, c.ConcurrencyToken
         """;
 
     private const string SelectControls = "SELECT " + ControlColumns + """
@@ -64,7 +64,7 @@ public sealed class DataHealthRepository(IConfiguration configuration)
     private const string SelectRunnable = """
         SELECT c.ControlId, c.Name, c.OffsetDays, c.OffsetType, c.HistoryDays, c.MissingCheck, c.DecreaseCheck,
                c.DecreaseTolerancePercent, s.DisplayName, s.SchemaName, s.ObjectName, s.DateColumn,
-               s.DateColumnType, s.DateStyles
+               c.DateColumnType, c.DateStyles
         FROM FileScan.DataHealthControl AS c
         JOIN FileScan.DataHealthSource AS s ON s.ApprovedSourceId = c.ApprovedSourceId
         WHERE c.IsEnabled = 1 AND c.IsRetired = 0 AND s.IsActive = 1
@@ -72,46 +72,19 @@ public sealed class DataHealthRepository(IConfiguration configuration)
         """;
 
     private const string SelectSources = """
-        SELECT ApprovedSourceId, SourceKey, DisplayName, SchemaName, ObjectName, DateColumn, DateColumnType, DateStyles,
-               ConcurrencyToken
+        SELECT ApprovedSourceId, SourceKey, DisplayName, SchemaName, ObjectName, DateColumn
         FROM FileScan.DataHealthSource
         WHERE IsActive = 1
         ORDER BY DisplayName;
         """;
 
     private const string SelectSource = """
-        SELECT ApprovedSourceId, SourceKey, DisplayName, SchemaName, ObjectName, DateColumn, DateColumnType, DateStyles,
-               ConcurrencyToken
+        SELECT ApprovedSourceId, SourceKey, DisplayName, SchemaName, ObjectName, DateColumn
         FROM FileScan.DataHealthSource
         WHERE ApprovedSourceId = @Id AND IsActive = 1;
         """;
 
-    private const string SelectSourceForUpdate = """
-        SELECT ApprovedSourceId, SourceKey, DisplayName, SchemaName, ObjectName, DateColumn, DateColumnType, DateStyles,
-               ConcurrencyToken
-        FROM FileScan.DataHealthSource WITH (UPDLOCK, HOLDLOCK)
-        WHERE ApprovedSourceId = @Id AND IsActive = 1;
-        """;
-
-    private const string UpdateSourceFormat = """
-        UPDATE FileScan.DataHealthSource
-        SET DateColumnType = @DateColumnType, DateStyles = @DateStyles
-        WHERE ApprovedSourceId = @Id AND ConcurrencyToken = @ConcurrencyToken;
-        """;
-
-    private const string InsertSourceAudit = """
-        INSERT INTO FileScan.DataHealthSourceAudit (ApprovedSourceId, ChangedBy, FieldName, OldValue, NewValue)
-        VALUES (@SourceId, @ChangedBy, @FieldName, @OldValue, @NewValue);
-        """;
-
-    private const string SelectSourceAudit = """
-        SELECT AuditId, ChangedAtUtc, ChangedBy, FieldName, OldValue, NewValue
-        FROM FileScan.DataHealthSourceAudit
-        WHERE ApprovedSourceId = @Id
-        ORDER BY ChangedAtUtc DESC, AuditId DESC;
-        """;
-
-    // The column must exist on the named table or view, with the type the source record says. Values are parameters.
+    // The column must exist on the named table or view, with the type the control says. Values are parameters.
     private const string SelectColumnType = """
         SELECT typ.name
         FROM sys.columns AS col
@@ -124,10 +97,10 @@ public sealed class DataHealthRepository(IConfiguration configuration)
     private const string InsertControl = """
         INSERT INTO FileScan.DataHealthControl
             (Name, DisplayOrder, IsEnabled, ApprovedSourceId, OffsetDays, OffsetType, HistoryDays, MissingCheck,
-             DecreaseCheck, DecreaseTolerancePercent)
+             DecreaseCheck, DecreaseTolerancePercent, DateColumnType, DateStyles)
         OUTPUT INSERTED.ControlId
         VALUES (@Name, @DisplayOrder, @IsEnabled, @ApprovedSourceId, @OffsetDays, @OffsetType, @HistoryDays,
-                @MissingCheck, @DecreaseCheck, @DecreaseTolerancePercent);
+                @MissingCheck, @DecreaseCheck, @DecreaseTolerancePercent, @DateColumnType, @DateStyles);
         """;
 
     private const string UpdateControl = """
@@ -135,7 +108,8 @@ public sealed class DataHealthRepository(IConfiguration configuration)
         SET Name = @Name, DisplayOrder = @DisplayOrder, IsEnabled = @IsEnabled, ApprovedSourceId = @ApprovedSourceId,
             OffsetDays = @OffsetDays, OffsetType = @OffsetType, HistoryDays = @HistoryDays,
             MissingCheck = @MissingCheck, DecreaseCheck = @DecreaseCheck,
-            DecreaseTolerancePercent = @DecreaseTolerancePercent, UpdatedUtc = SYSUTCDATETIME()
+            DecreaseTolerancePercent = @DecreaseTolerancePercent, DateColumnType = @DateColumnType,
+            DateStyles = @DateStyles, UpdatedUtc = SYSUTCDATETIME()
         WHERE ControlId = @Id AND ConcurrencyToken = @ConcurrencyToken;
         """;
 
@@ -249,7 +223,7 @@ public sealed class DataHealthRepository(IConfiguration configuration)
         var isText = DataHealthRules.IsTextType(control.DateColumnType);
         var styles = isText ? DataHealthRules.ParseStyles(control.DateStyles) : null;
         if (isText && styles is null)
-            throw new InvalidOperationException("The approved source has no valid date styles.");
+            throw new InvalidOperationException("The control has no valid date styles.");
 
         await using var connection = await OpenAsync(cancellationToken);
 
@@ -266,7 +240,7 @@ public sealed class DataHealthRepository(IConfiguration configuration)
             ? DataHealthRules.IsTextType(actualType)
             : string.Equals(actualType, control.DateColumnType, StringComparison.OrdinalIgnoreCase);
         if (actualType is null || !typeMatches)
-            throw new InvalidOperationException("The approved source does not match its configured column type.");
+            throw new InvalidOperationException("The control's column type does not match the source column.");
 
         // Only names that passed the validation and the catalog check are quoted into the text. Values are parameters.
         var sql = isText
@@ -297,95 +271,6 @@ public sealed class DataHealthRepository(IConfiguration configuration)
         }
 
         return new CountResult(counts, unreadable);
-    }
-
-    /// Changes the date type and styles of an existing approved source. Names and the source itself cannot be changed here.
-    /// Returns NotFound, Conflict (token changed) or Saved. Writes one audit row per changed field.
-    public async Task<SaveOutcome> UpdateSourceFormatAsync(int id, DataHealthSourceFormatInput input, string user, CancellationToken cancellationToken = default)
-    {
-        var token = input.ConcurrencyToken is null ? null : TryDecodeToken(input.ConcurrencyToken);
-        if (token is null)
-            return SaveOutcome.Conflict;
-
-        await using var connection = await OpenAsync(cancellationToken);
-        await using var transaction = connection.BeginTransaction();
-
-        ApprovedSourceDto? current;
-        await using (var read = new SqlCommand(SelectSourceForUpdate, connection, transaction) { CommandTimeout = CommandTimeoutSeconds })
-        {
-            read.Parameters.Add("@Id", SqlDbType.Int).Value = id;
-            await using var reader = await read.ExecuteReaderAsync(cancellationToken);
-            current = await reader.ReadAsync(cancellationToken) ? ReadSource(reader) : null;
-        }
-
-        if (current is null)
-            return SaveOutcome.NotFound;
-
-        if (current.ConcurrencyToken != input.ConcurrencyToken)
-            return SaveOutcome.Conflict;
-
-        var newType = input.DateColumnType!;
-        string? newStyles = null;
-        if (DataHealthRules.IsTextType(newType))
-        {
-            var parsed = DataHealthRules.ParseStyles(input.DateStyles);
-            if (parsed is null)
-                return SaveOutcome.Invalid;
-
-            newStyles = string.Join(",", parsed);
-        }
-
-        var changes = new List<AuditChange>();
-        if (current.DateColumnType != newType)
-            changes.Add(new AuditChange("dateColumnType", current.DateColumnType, newType));
-        if (current.DateStyles != newStyles)
-            changes.Add(new AuditChange("dateStyles", current.DateStyles, newStyles));
-
-        await using (var update = new SqlCommand(UpdateSourceFormat, connection, transaction) { CommandTimeout = CommandTimeoutSeconds })
-        {
-            update.Parameters.Add("@Id", SqlDbType.Int).Value = id;
-            update.Parameters.Add("@DateColumnType", SqlDbType.NVarChar, 20).Value = newType;
-            update.Parameters.Add("@DateStyles", SqlDbType.NVarChar, 100).Value = (object?)newStyles ?? DBNull.Value;
-            update.Parameters.Add("@ConcurrencyToken", SqlDbType.VarBinary, 8).Value = token;
-            if (await update.ExecuteNonQueryAsync(cancellationToken) != 1)
-                return SaveOutcome.Conflict;
-        }
-
-        foreach (var change in changes)
-        {
-            await using var audit = new SqlCommand(InsertSourceAudit, connection, transaction) { CommandTimeout = CommandTimeoutSeconds };
-            audit.Parameters.Add("@SourceId", SqlDbType.Int).Value = id;
-            audit.Parameters.Add("@ChangedBy", SqlDbType.NVarChar, 256).Value = user;
-            audit.Parameters.Add("@FieldName", SqlDbType.NVarChar, 100).Value = change.FieldName;
-            audit.Parameters.Add("@OldValue", SqlDbType.NVarChar, -1).Value = (object?)change.OldValue ?? DBNull.Value;
-            audit.Parameters.Add("@NewValue", SqlDbType.NVarChar, -1).Value = (object?)change.NewValue ?? DBNull.Value;
-            await audit.ExecuteNonQueryAsync(cancellationToken);
-        }
-
-        await transaction.CommitAsync(cancellationToken);
-        return SaveOutcome.Saved;
-    }
-
-    public async Task<IReadOnlyList<AuditEntryDto>> SourceAuditForAsync(int id, CancellationToken cancellationToken = default)
-    {
-        await using var connection = await OpenAsync(cancellationToken);
-        await using var command = new SqlCommand(SelectSourceAudit, connection) { CommandTimeout = CommandTimeoutSeconds };
-        command.Parameters.Add("@Id", SqlDbType.Int).Value = id;
-        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
-
-        var entries = new List<AuditEntryDto>();
-        while (await reader.ReadAsync(cancellationToken))
-        {
-            entries.Add(new AuditEntryDto(
-                reader.GetInt64(0),
-                reader.GetDateTime(1),
-                reader.GetString(2),
-                reader.GetString(3),
-                reader.IsDBNull(4) ? null : reader.GetString(4),
-                reader.IsDBNull(5) ? null : reader.GetString(5)));
-        }
-
-        return entries;
     }
 
     public async Task<int> CreateControlAsync(DataHealthControlInput input, string user, CancellationToken cancellationToken = default)
@@ -431,6 +316,8 @@ public sealed class DataHealthRepository(IConfiguration configuration)
             MissingCheck = input.MissingCheck,
             DecreaseCheck = input.DecreaseCheck,
             DecreaseTolerancePercent = input.DecreaseTolerancePercent,
+            DateColumnType = input.DateColumnType!,
+            DateStyles = DataHealthRules.NormalizeStyles(input.DateColumnType, input.DateStyles),
         };
         var changes = ControlAuditDiff.Diff(current, updated);
 
@@ -573,6 +460,9 @@ public sealed class DataHealthRepository(IConfiguration configuration)
         command.Parameters.Add("@MissingCheck", SqlDbType.Bit).Value = input.MissingCheck;
         command.Parameters.Add("@DecreaseCheck", SqlDbType.Bit).Value = input.DecreaseCheck;
         command.Parameters.Add("@DecreaseTolerancePercent", SqlDbType.Decimal).Value = input.DecreaseTolerancePercent;
+        command.Parameters.Add("@DateColumnType", SqlDbType.NVarChar, 20).Value = input.DateColumnType!;
+        command.Parameters.Add("@DateStyles", SqlDbType.NVarChar, 100).Value =
+            (object?)DataHealthRules.NormalizeStyles(input.DateColumnType, input.DateStyles) ?? DBNull.Value;
     }
 
     private static ApprovedSourceDto ReadSource(SqlDataReader reader) =>
@@ -582,10 +472,7 @@ public sealed class DataHealthRepository(IConfiguration configuration)
             DisplayName: reader.GetString(2),
             SchemaName: reader.GetString(3),
             ObjectName: reader.GetString(4),
-            DateColumn: reader.GetString(5),
-            DateColumnType: reader.GetString(6),
-            DateStyles: reader.IsDBNull(7) ? null : reader.GetString(7),
-            ConcurrencyToken: Convert.ToBase64String(reader.GetFieldValue<byte[]>(8)));
+            DateColumn: reader.GetString(5));
 
     private static DataHealthControlDto ReadControl(SqlDataReader reader) =>
         new(
@@ -602,8 +489,10 @@ public sealed class DataHealthRepository(IConfiguration configuration)
             MissingCheck: reader.GetBoolean(10),
             DecreaseCheck: reader.GetBoolean(11),
             DecreaseTolerancePercent: reader.GetDecimal(12),
-            IsRetired: reader.GetBoolean(13),
-            ConcurrencyToken: Convert.ToBase64String(reader.GetFieldValue<byte[]>(14)));
+            DateColumnType: reader.GetString(13),
+            DateStyles: reader.IsDBNull(14) ? null : reader.GetString(14),
+            IsRetired: reader.GetBoolean(15),
+            ConcurrencyToken: Convert.ToBase64String(reader.GetFieldValue<byte[]>(16)));
 
     private static byte[]? TryDecodeToken(string token)
     {
