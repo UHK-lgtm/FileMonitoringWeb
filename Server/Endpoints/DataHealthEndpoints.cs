@@ -18,8 +18,15 @@ public static class DataHealthEndpoints
         group.MapGet("sources", async (DataHealthRepository repository, CancellationToken cancellationToken) =>
             Results.Ok(await repository.ListSourcesAsync(cancellationToken)));
 
-        group.MapGet("controls",async (DataHealthRepository repository, CancellationToken cancellationToken) =>
+        group.MapGet("controls", async (DataHealthRepository repository, CancellationToken cancellationToken) =>
             Results.Ok(await repository.ListControlsAsync(cancellationToken)));
+
+        // One control's check, so the page can fill in each row as it finishes.
+        group.MapGet("controls/{id:int}/result", async (int id, DataHealthService service, CancellationToken cancellationToken) =>
+        {
+            var result = await service.GetControlResultAsync(id, cancellationToken);
+            return result is null ? Results.NotFound() : Results.Ok(result);
+        });
 
         group.MapGet("controls/{id:int}", async (int id, DataHealthRepository repository, CancellationToken cancellationToken) =>
         {

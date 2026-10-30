@@ -61,14 +61,23 @@ public sealed class DataHealthRepository(IConfiguration configuration)
         WHERE c.ControlId = @Id;
         """;
 
-    private const string SelectRunnable = """
+    private const string RunnableColumns = """
         SELECT c.ControlId, c.Name, c.OffsetDays, c.OffsetType, c.HistoryDays, c.MissingCheck, c.DecreaseCheck,
                c.DecreaseTolerancePercent, s.DisplayName, s.SchemaName, s.ObjectName, s.DateColumn,
                c.DateColumnType, c.DateStyles
         FROM FileScan.DataHealthControl AS c
         JOIN FileScan.DataHealthSource AS s ON s.ApprovedSourceId = c.ApprovedSourceId
+        """;
+
+    private const string SelectRunnable = RunnableColumns + """
+
         WHERE c.IsEnabled = 1 AND c.IsRetired = 0 AND s.IsActive = 1
         ORDER BY c.DisplayOrder, c.ControlId;
+        """;
+
+    private const string SelectRunnableById = RunnableColumns + """
+
+        WHERE c.ControlId = @Id AND c.IsEnabled = 1 AND c.IsRetired = 0 AND s.IsActive = 1;
         """;
 
     private const string SelectSources = """
@@ -189,26 +198,38 @@ public sealed class DataHealthRepository(IConfiguration configuration)
 
         var controls = new List<RunnableControl>();
         while (await reader.ReadAsync(cancellationToken))
-        {
-            controls.Add(new RunnableControl(
-                ControlId: reader.GetInt32(0),
-                Name: reader.GetString(1),
-                OffsetDays: reader.GetInt32(2),
-                OffsetType: reader.GetString(3),
-                HistoryDays: reader.GetInt32(4),
-                MissingCheck: reader.GetBoolean(5),
-                DecreaseCheck: reader.GetBoolean(6),
-                Tolerance: reader.GetDecimal(7),
-                SourceName: reader.GetString(8),
-                SchemaName: reader.GetString(9),
-                ObjectName: reader.GetString(10),
-                DateColumn: reader.GetString(11),
-                DateColumnType: reader.GetString(12),
-                DateStyles: reader.IsDBNull(13) ? null : reader.GetString(13)));
-        }
+            controls.Add(ReadRunnable(reader));
 
         return controls;
     }
+
+    /// One enabled control, or null when it is missing, retired, disabled, or its source is inactive.
+    public async Task<RunnableControl?> GetRunnableAsync(int id, CancellationToken cancellationToken = default)
+    {
+        await using var connection = await OpenAsync(cancellationToken);
+        await using var command = new SqlCommand(SelectRunnableById, connection) { CommandTimeout = CommandTimeoutSeconds };
+        command.Parameters.Add("@Id", SqlDbType.Int).Value = id;
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+
+        return await reader.ReadAsync(cancellationToken) ? ReadRunnable(reader) : null;
+    }
+
+    private static RunnableControl ReadRunnable(SqlDataReader reader) =>
+        new(
+            ControlId: reader.GetInt32(0),
+            Name: reader.GetString(1),
+            OffsetDays: reader.GetInt32(2),
+            OffsetType: reader.GetString(3),
+            HistoryDays: reader.GetInt32(4),
+            MissingCheck: reader.GetBoolean(5),
+            DecreaseCheck: reader.GetBoolean(6),
+            Tolerance: reader.GetDecimal(7),
+            SourceName: reader.GetString(8),
+            SchemaName: reader.GetString(9),
+            ObjectName: reader.GetString(10),
+            DateColumn: reader.GetString(11),
+            DateColumnType: reader.GetString(12),
+            DateStyles: reader.IsDBNull(13) ? null : reader.GetString(13));
 
     /// Counts records per day in [from, toExclusive). Names must be valid and must exist in the catalog with the configured type.
     /// Text columns are read with the configured styles; values that match none of them are counted as unreadable.

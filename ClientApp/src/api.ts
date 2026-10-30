@@ -237,6 +237,7 @@ export const api = {
   getLatestScanRun: () => request<LatestScanRunResponse>('GET', '/scan-runs/latest'),
 
   getDataHealth: () => request<DataHealthResults>('GET', '/data-health'),
+  getDataHealthControlResult: (id: number) => request<DataHealthControlResult>('GET', `/data-health/controls/${id}/result`),
   getDataHealthSources: () => request<ApprovedSource[]>('GET', '/data-health/sources'),
   getDataHealthControls: () => request<DataHealthControl[]>('GET', '/data-health/controls'),
   getDataHealthControl: (id: number) => request<DataHealthControl>('GET', `/data-health/controls/${id}`),

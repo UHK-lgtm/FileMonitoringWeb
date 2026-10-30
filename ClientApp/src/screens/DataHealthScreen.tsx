@@ -7,12 +7,11 @@ import {
   type DataHealthControl,
   type DataHealthControlInput,
   type DataHealthControlResult,
-  type DataHealthResults,
   type DataHealthStatus,
 } from '../api'
 import { ErrorList } from '../components/ErrorList'
 import { useToast } from '../components/toastContext'
-import { formatDateTime } from '../format'
+import { formatDateTime, todayInLuxembourg } from '../format'
 
 type View = 'results' | 'configure'
 
@@ -41,6 +40,14 @@ const textColumnTypes = ['varchar', 'nvarchar', 'char', 'nchar']
 // Must match DataHealthRules.AllowedStyles on the server.
 const allowedStyles = new Set([23, 101, 102, 103, 104, 105, 106, 107, 110, 111, 112, 113, 114, 120, 121, 126])
 
+// The last result of each control, kept in this browser, so the page can show it while the new checks run.
+const lastKnownKey = 'fm-data-health-last'
+
+interface KnownResult {
+  result: DataHealthControlResult
+  checkedAt: string
+}
+
 /// Reads "112, 23" into [112, 23]. Null when a part is not an allowed style or a style is repeated.
 function parseStyleList(value: string): number[] | null {
   const styles: number[] = []
@@ -60,12 +67,36 @@ function parseStyleList(value: string): number[] | null {
   return styles.length > 0 ? styles : null
 }
 
+function readLastKnown(): Record<number, KnownResult> {
+  try {
+    const raw = window.localStorage.getItem(lastKnownKey)
+    return raw ? (JSON.parse(raw) as Record<number, KnownResult>) : {}
+  } catch {
+    // Storage can be blocked or full. The page still works without it.
+    return {}
+  }
+}
+
+function saveLastKnown(controlId: number, known: KnownResult) {
+  try {
+    const all = readLastKnown()
+    all[controlId] = known
+    window.localStorage.setItem(lastKnownKey, JSON.stringify(all))
+  } catch {
+    // Storage can be blocked or full. The page still works without it.
+  }
+}
+
 function formatDate(value: string | null): string {
   return value === null ? '—' : new Date(`${value}T00:00:00`).toLocaleDateString(undefined, { dateStyle: 'medium' })
 }
 
 function formatCount(value: number | null): string {
   return value === null ? '—' : value.toLocaleString()
+}
+
+function Skeleton({ width = 56 }: { width?: number }) {
+  return <span className="skeleton" style={{ width }} aria-hidden="true" />
 }
 
 function Sparkline({ points }: { points: { count: number }[] }) {
@@ -109,30 +140,75 @@ export function DataHealthScreen() {
   )
 }
 
+// One row of the results page. Each row fills in when its own check returns.
+interface CheckRow {
+  control: DataHealthControl
+  // The result to show. While a check runs it can be the last known result, shown with its time.
+  result: DataHealthControlResult | null
+  checkedAt: string | null
+  state: 'checking' | 'done' | 'failed'
+}
+
 function ResultsView() {
-  const [results, setResults] = useState<DataHealthResults | null>(null)
+  const [rows, setRows] = useState<CheckRow[]>([])
   const [errors, setErrors] = useState<string[]>([])
-  const [loading, setLoading] = useState(true)
+  const [loadingList, setLoadingList] = useState(true)
   const [reloadKey, setReloadKey] = useState(0)
 
   useEffect(() => {
     let ignore = false
+    const known = readLastKnown()
+
     api
-      .getDataHealth()
-      .then((response) => {
-        if (!ignore) {
-          setResults(response)
-          setErrors([])
+      .getDataHealthControls()
+      .then((controls) => {
+        if (ignore) {
+          return
+        }
+
+        const enabled = controls.filter((control) => control.isEnabled && !control.isRetired)
+        setRows(
+          enabled.map((control) => ({
+            control,
+            result: known[control.id]?.result ?? null,
+            checkedAt: known[control.id]?.checkedAt ?? null,
+            state: 'checking',
+          })),
+        )
+        setErrors([])
+        setLoadingList(false)
+
+        // Each check is requested on its own, so a slow source delays only its own row.
+        for (const control of enabled) {
+          api
+            .getDataHealthControlResult(control.id)
+            .then((result) => {
+              if (ignore) {
+                return
+              }
+
+              const checkedAt = new Date().toISOString()
+              saveLastKnown(control.id, { result, checkedAt })
+              setRows((current) =>
+                current.map((row) => (row.control.id === control.id ? { ...row, result, checkedAt, state: 'done' } : row)),
+              )
+            })
+            .catch((error: unknown) => {
+              if (ignore) {
+                return
+              }
+
+              setRows((current) =>
+                current.map((row) => (row.control.id === control.id ? { ...row, result: null, checkedAt: null, state: 'failed' } : row)),
+              )
+              setErrors(messagesFrom(error))
+            })
         }
       })
       .catch((error: unknown) => {
         if (!ignore) {
           setErrors(messagesFrom(error))
-        }
-      })
-      .finally(() => {
-        if (!ignore) {
-          setLoading(false)
+          setLoadingList(false)
         }
       })
 
@@ -142,60 +218,79 @@ function ResultsView() {
   }, [reloadKey])
 
   function refresh() {
-    setLoading(true)
+    setLoadingList(true)
     setReloadKey((key) => key + 1)
   }
+
+  const checking = rows.filter((row) => row.state === 'checking').length
+  const finished = rows.length - checking
+  const done = rows.filter((row) => row.state === 'done' && row.result !== null)
+  const missingCount = done.filter((row) => row.result?.status === 'Missing').length
+  const decreaseCount = done.filter((row) => row.result?.status === 'Decrease').length
+  const errorCount = rows.filter((row) => row.state === 'failed' || (row.state === 'done' && row.result?.status === 'Error')).length
+  const healthy = rows.every((row) => row.state === 'done' && row.result !== null && !row.result.attention)
+  const latestCheck = rows
+    .map((row) => (row.state === 'done' ? row.checkedAt : null))
+    .filter((value): value is string => value !== null)
+    .sort()
+    .at(-1)
 
   return (
     <>
       <div className="toolbar">
         <div>
           <h2>Data Health</h2>
-          {results && <span className="muted small">Refreshed {formatDateTime(results.refreshedAtUtc)}</span>}
+          {checking > 0 ? (
+            <span className="muted small">Checking {finished} of {rows.length}…</span>
+          ) : (
+            latestCheck && <span className="muted small">Refreshed {formatDateTime(latestCheck)}</span>
+          )}
         </div>
-        <button type="button" className="button secondary" onClick={refresh} disabled={loading}>
+        <button type="button" className="button secondary" onClick={refresh} disabled={loadingList || checking > 0}>
           Refresh
         </button>
       </div>
 
       <ErrorList messages={errors} />
 
-      {loading && results === null && <p className="muted">Running the checks…</p>}
+      {loadingList && rows.length === 0 && <p className="muted">Loading the checks…</p>}
 
-      {results !== null && (
+      {(rows.length > 0 || !loadingList) && (
         <>
           <section className="summary-strip" aria-label="Data Health summary">
             <div className="summary-cell">
               <span className="summary-label">Control date</span>
-              <span className="summary-value">{formatDate(results.today)}</span>
+              <span className="summary-value">{formatDate(todayInLuxembourg())}</span>
               <span className="summary-hint">Today in Europe/Luxembourg</span>
             </div>
             <div className="summary-cell">
               <span className="summary-label">Enabled sources</span>
-              <span className="summary-value">{results.enabledSources}</span>
-              <span className="summary-hint">Checks that ran</span>
+              <span className="summary-value">{rows.length}</span>
+              <span className="summary-hint">Checks that run</span>
             </div>
             <div className="summary-cell">
               <span className="summary-label">Missing</span>
-              <span className="summary-value attention">{results.missingCount}</span>
+              <span className="summary-value attention">{missingCount}</span>
               <span className="summary-hint">No data on the control date</span>
             </div>
             <div className="summary-cell">
               <span className="summary-label">Decrease</span>
-              <span className="summary-value warn">{results.decreaseCount}</span>
+              <span className="summary-value warn">{decreaseCount}</span>
               <span className="summary-hint">Lower than the comparison</span>
             </div>
             <div className="summary-cell">
               <span className="summary-label">Overall</span>
-              <span className={results.healthy ? 'summary-value ok' : 'summary-value attention'}>
-                {results.healthy ? 'Healthy' : 'Attention'}
+              <span className={checking === 0 && healthy ? 'summary-value ok' : checking > 0 ? 'summary-value' : 'summary-value attention'}>
+                {checking > 0 ? 'Checking…' : healthy ? 'Healthy' : 'Attention'}
               </span>
-              <span className="summary-hint">{results.errorCount > 0 ? `${results.errorCount} check(s) did not run` : 'No open attention items'}</span>
+              <span className="summary-hint">
+                {checking > 0 ? `${finished} of ${rows.length} done` : errorCount > 0 ? `${errorCount} check(s) did not run` : 'No open attention items'}
+              </span>
             </div>
           </section>
 
           <section className="card">
-            {results.controls.length === 0 ? (
+            {rows.length === 0 ? (
               <div className="empty">
                 <strong>No enabled controls</strong>
                 <span>Add a control on the Configure tab. It must use an approved source.</span>
@@ -217,8 +312,8 @@ function ResultsView() {
                     </tr>
                   </thead>
                   <tbody>
-                    {results.controls.map((row) => (
-                      <ResultRow key={row.controlId} row={row} />
+                    {rows.map((row) => (
+                      <ResultRow key={row.control.id} row={row} />
                     ))}
                   </tbody>
                 </table>
@@ -231,34 +326,60 @@ function ResultsView() {
   )
 }
 
-function ResultRow({ row }: { row: DataHealthControlResult }) {
+function ResultRow({ row }: { row: CheckRow }) {
+  const { control, result, checkedAt, state } = row
+  const pending = state === 'checking' && result === null
+  const showingLastKnown = state === 'checking' && result !== null
+
   return (
-    <tr>
+    <tr aria-busy={state === 'checking'}>
       <td>
-        {row.name}
-        <div className="muted small">{row.sourceName}</div>
-        {row.message && <div className="small">{row.message}</div>}
-        {row.unreadableCount > 0 && (
+        {control.name}
+        <div className="muted small">{control.sourceName}</div>
+        {showingLastKnown && (
+          <div className="muted small">Last checked {formatDateTime(checkedAt)}. Checking now…</div>
+        )}
+        {state === 'failed' && <div className="small">This check could not run. Ask an administrator to look at the logs.</div>}
+        {state === 'done' && result?.message && <div className="small">{result.message}</div>}
+        {state === 'done' && result !== null && result.unreadableCount > 0 && (
           <div className="small unreadable-note">
-            {row.unreadableCount.toLocaleString()} row(s) have a date that matches none of the configured styles. They are not counted.
+            {result.unreadableCount.toLocaleString()} row(s) have a date that matches none of the configured styles. They are not counted.
           </div>
         )}
       </td>
-      <td>{formatDate(row.controlDate)}</td>
-      <td>{formatCount(row.controlCount)}</td>
-      <td>{formatDate(row.comparisonDate)}</td>
-      <td>{formatCount(row.previousCount)}</td>
-      <td>{row.percentChange === null ? '—' : `${row.percentChange > 0 ? '+' : ''}${row.percentChange}%`}</td>
+      <td>{pending ? <Skeleton /> : formatDate(result?.controlDate ?? null)}</td>
+      <td>{pending ? <Skeleton width={40} /> : formatCount(result?.controlCount ?? null)}</td>
+      <td>{pending ? <Skeleton /> : formatDate(result?.comparisonDate ?? null)}</td>
+      <td>{pending ? <Skeleton width={40} /> : formatCount(result?.previousCount ?? null)}</td>
       <td>
-        {formatDate(row.latestVisibleDate)}
-        <div className="muted small">{row.latestVisibleCount === null ? '' : `${formatCount(row.latestVisibleCount)} rows`}</div>
+        {pending ? (
+          <Skeleton width={44} />
+        ) : result?.percentChange == null ? (
+          '—'
+        ) : (
+          `${result.percentChange > 0 ? '+' : ''}${result.percentChange}%`
+        )}
       </td>
       <td>
-        <span className={`status ${statusBadge[row.status]}`}>{statusLabels[row.status]}</span>
+        {pending ? (
+          <Skeleton />
+        ) : (
+          <>
+            {formatDate(result?.latestVisibleDate ?? null)}
+            <div className="muted small">{result?.latestVisibleCount == null ? '' : `${formatCount(result.latestVisibleCount)} rows`}</div>
+          </>
+        )}
       </td>
       <td>
-        <Sparkline points={row.trend} />
+        {pending ? (
+          <Skeleton width={72} />
+        ) : state === 'failed' ? (
+          <span className={`status ${statusBadge.Error}`}>{statusLabels.Error}</span>
+        ) : result !== null ? (
+          <span className={`status ${statusBadge[result.status]}`}>{statusLabels[result.status]}</span>
+        ) : null}
       </td>
+      <td>{pending ? <Skeleton width={120} /> : <Sparkline points={result?.trend ?? []} />}</td>
     </tr>
   )
 }

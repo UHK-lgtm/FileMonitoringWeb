@@ -27,6 +27,24 @@ public sealed class DataHealthService(
         return results;
     }
 
+    /// One control's result, for the page to fill in row by row. Null when the control is not enabled, or does not exist.
+    public async Task<ControlResultDto?> GetControlResultAsync(int controlId, CancellationToken cancellationToken = default)
+    {
+        var key = ControlCacheKey(controlId);
+        if (cache.TryGetValue(key, out ControlResultDto? cached) && cached is not null)
+            return cached;
+
+        var control = await repository.GetRunnableAsync(controlId, cancellationToken);
+        if (control is null)
+            return null;
+
+        var result = await RunControlAsync(control, LocalDates.Today(LocalDates.Luxembourg), cancellationToken);
+        cache.Set(key, result, CacheDuration);
+        return result;
+    }
+
+    private static string ControlCacheKey(int controlId) => $"data-health:control:{controlId}";
+
     private async Task<DataHealthResultsDto> ComputeAsync(CancellationToken cancellationToken)
     {
         var today = LocalDates.Today(LocalDates.Luxembourg);
