@@ -1,6 +1,6 @@
 namespace FileMonitoringWeb.Server.DataHealth;
 
-/// Checks a Data Health control before it is saved. Pure: no SQL and no Azure types.
+/// Checks Data Health input before it is saved. Pure: no SQL and no Azure types.
 public static class DataHealthValidator
 {
     public static IReadOnlyList<string> Validate(DataHealthControlInput input)
@@ -30,6 +30,30 @@ public static class DataHealthValidator
 
         if (input.DecreaseTolerancePercent is < 0 or > 100)
             errors.Add("decreaseTolerancePercent must be between 0 and 100.");
+
+        return errors;
+    }
+
+    /// The stored type must be a supported date or text type. Text types need an ordered style list; date types must not have one.
+    public static IReadOnlyList<string> ValidateSourceFormat(DataHealthSourceFormatInput input)
+    {
+        var errors = new List<string>();
+
+        if (!DataHealthRules.IsAllowedColumnType(input.DateColumnType))
+        {
+            errors.Add("dateColumnType must be one of date, datetime, datetime2, smalldatetime, datetimeoffset, varchar, nvarchar, char or nchar.");
+            return errors;
+        }
+
+        if (DataHealthRules.IsTextType(input.DateColumnType))
+        {
+            if (DataHealthRules.ParseStyles(input.DateStyles) is null)
+                errors.Add("dateStyles must list one or more allowed styles in order, for example 112 or 112,23. Each style may appear once.");
+        }
+        else if (!string.IsNullOrWhiteSpace(input.DateStyles))
+        {
+            errors.Add("dateStyles must be empty for a real date column.");
+        }
 
         return errors;
     }

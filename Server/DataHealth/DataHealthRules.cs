@@ -71,10 +71,54 @@ public static class DataHealthRules
             .Select(entry => (DateOnly?)entry.Key)
             .Max();
 
-    /// A table, view or column name that is safe to place in SQL: letters, digits and underscores, starting with a letter or underscore.
-    /// Names are also checked against the database catalog before use. Values are never built into SQL text.
-    public static bool IsSafeIdentifier(string? name) =>
-        name is not null && System.Text.RegularExpressions.Regex.IsMatch(name, "^[A-Za-z_][A-Za-z0-9_]{0,127}$");
+    /// SQL Server convert styles a text date column may use. Only these numbers are ever placed into SQL text.
+    public static readonly IReadOnlySet<int> AllowedStyles = new HashSet<int>
+    {
+        23, 101, 102, 103, 104, 105, 106, 107, 110, 111, 112, 113, 114, 120, 121, 126,
+    };
+
+    public static readonly IReadOnlySet<string> DateColumnTypes = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+    {
+        "date", "datetime", "datetime2", "smalldatetime", "datetimeoffset",
+    };
+
+    public static readonly IReadOnlySet<string> TextColumnTypes = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+    {
+        "varchar", "nvarchar", "char", "nchar",
+    };
+
+    public static bool IsTextType(string? type) => type is not null && TextColumnTypes.Contains(type);
+
+    public static bool IsAllowedColumnType(string? type) =>
+        type is not null && (DateColumnTypes.Contains(type) || TextColumnTypes.Contains(type));
+
+    /// Reads "112,23,103" into the styles in that order. Null when the list is empty, has an unknown style, or repeats one.
+    public static IReadOnlyList<int>? ParseStyles(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return null;
+
+        var styles = new List<int>();
+        foreach (var part in value.Split(','))
+        {
+            if (!int.TryParse(part, System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out var style)
+                || !AllowedStyles.Contains(style)
+                || styles.Contains(style))
+                return null;
+
+            styles.Add(style);
+        }
+
+        return styles;
+    }
+
+    /// A table, view, schema or column name as it appears in the catalog. Spaces and punctuation are allowed, because the
+    /// name is always quoted, and the catalog check must find the exact name before anything runs.
+    public static bool IsValidName(string? name) =>
+        name is { Length: > 0 and <= 128 } && name.All(character => !char.IsControl(character));
+
+    /// Brackets a name for SQL. A ']' inside the name is doubled, so the name cannot close the bracket early.
+    public static string QuoteName(string name) => "[" + name.Replace("]", "]]", StringComparison.Ordinal) + "]";
 
     /// Only Missing and Decrease are attention conditions. A check that is switched off does not raise attention.
     public static bool IsAttention(ControlStatus status, bool missingCheck, bool decreaseCheck) =>

@@ -66,7 +66,8 @@ public sealed class DataHealthService(
             var from = controlDate.AddDays(-control.HistoryDays);
             var toExclusive = today.AddDays(1);
 
-            var counts = await repository.CountByDayAsync(control, from, toExclusive, cancellationToken);
+            var result = await repository.CountByDayAsync(control, from, toExclusive, cancellationToken);
+            var counts = result.CountsByDay;
 
             var controlCount = counts.GetValueOrDefault(controlDate);
             var previousDate = DataHealthRules.PreviousAvailableDate(controlDate, counts);
@@ -100,7 +101,8 @@ public sealed class DataHealthService(
                 Status: status.ToString(),
                 Attention: DataHealthRules.IsAttention(status, control.MissingCheck, control.DecreaseCheck),
                 Message: null,
-                Trend: trend);
+                Trend: trend,
+                UnreadableCount: result.UnreadableRows);
         }
         catch (Exception exception) when (!cancellationToken.IsCancellationRequested)
         {

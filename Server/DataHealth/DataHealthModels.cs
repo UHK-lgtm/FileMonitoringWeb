@@ -7,7 +7,16 @@ public sealed record ApprovedSourceDto(
     string DisplayName,
     string SchemaName,
     string ObjectName,
-    string DateColumn);
+    string DateColumn,
+    string DateColumnType,
+    string? DateStyles,
+    string ConcurrencyToken);
+
+/// The body of PUT for a source's date format. Only the format can be changed from the web app.
+public sealed record DataHealthSourceFormatInput(
+    string? DateColumnType,
+    string? DateStyles,
+    string? ConcurrencyToken);
 
 /// One Data Health control, as returned by the configuration endpoints.
 public sealed record DataHealthControlDto(
@@ -59,7 +68,8 @@ public sealed record ControlResultDto(
     string Status,
     bool Attention,
     string? Message,
-    IReadOnlyList<TrendPoint> Trend);
+    IReadOnlyList<TrendPoint> Trend,
+    int UnreadableCount = 0);
 
 /// The whole Data Health page: summary and one result per enabled control, in display order.
 public sealed record DataHealthResultsDto(

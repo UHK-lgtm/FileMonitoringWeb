@@ -19,7 +19,12 @@ public sealed record RunnableControl(
     string SourceName,
     string SchemaName,
     string ObjectName,
-    string DateColumn);
+    string DateColumn,
+    string DateColumnType,
+    string? DateStyles);
+
+/// The rows a count returned, and how many text values matched none of the styles.
+public sealed record CountResult(IReadOnlyDictionary<DateOnly, int> CountsByDay, int UnreadableRows);
 
 /// Data Health persistence. Parameterized SQL for every value. Table and column names come only from the approved
 /// source list, are checked against a strict pattern, and are checked against the catalog before they are used.
@@ -58,7 +63,8 @@ public sealed class DataHealthRepository(IConfiguration configuration)
 
     private const string SelectRunnable = """
         SELECT c.ControlId, c.Name, c.OffsetDays, c.OffsetType, c.HistoryDays, c.MissingCheck, c.DecreaseCheck,
-               c.DecreaseTolerancePercent, s.DisplayName, s.SchemaName, s.ObjectName, s.DateColumn
+               c.DecreaseTolerancePercent, s.DisplayName, s.SchemaName, s.ObjectName, s.DateColumn,
+               s.DateColumnType, s.DateStyles
         FROM FileScan.DataHealthControl AS c
         JOIN FileScan.DataHealthSource AS s ON s.ApprovedSourceId = c.ApprovedSourceId
         WHERE c.IsEnabled = 1 AND c.IsRetired = 0 AND s.IsActive = 1
@@ -66,27 +72,53 @@ public sealed class DataHealthRepository(IConfiguration configuration)
         """;
 
     private const string SelectSources = """
-        SELECT ApprovedSourceId, SourceKey, DisplayName, SchemaName, ObjectName, DateColumn
+        SELECT ApprovedSourceId, SourceKey, DisplayName, SchemaName, ObjectName, DateColumn, DateColumnType, DateStyles,
+               ConcurrencyToken
         FROM FileScan.DataHealthSource
         WHERE IsActive = 1
         ORDER BY DisplayName;
         """;
 
     private const string SelectSource = """
-        SELECT ApprovedSourceId, SourceKey, DisplayName, SchemaName, ObjectName, DateColumn
+        SELECT ApprovedSourceId, SourceKey, DisplayName, SchemaName, ObjectName, DateColumn, DateColumnType, DateStyles,
+               ConcurrencyToken
         FROM FileScan.DataHealthSource
         WHERE ApprovedSourceId = @Id AND IsActive = 1;
         """;
 
-    // The column must exist, be a date type, and belong to the named table or view. Values are parameters.
-    private const string SelectDateColumnCheck = """
-        SELECT COUNT(*)
+    private const string SelectSourceForUpdate = """
+        SELECT ApprovedSourceId, SourceKey, DisplayName, SchemaName, ObjectName, DateColumn, DateColumnType, DateStyles,
+               ConcurrencyToken
+        FROM FileScan.DataHealthSource WITH (UPDLOCK, HOLDLOCK)
+        WHERE ApprovedSourceId = @Id AND IsActive = 1;
+        """;
+
+    private const string UpdateSourceFormat = """
+        UPDATE FileScan.DataHealthSource
+        SET DateColumnType = @DateColumnType, DateStyles = @DateStyles
+        WHERE ApprovedSourceId = @Id AND ConcurrencyToken = @ConcurrencyToken;
+        """;
+
+    private const string InsertSourceAudit = """
+        INSERT INTO FileScan.DataHealthSourceAudit (ApprovedSourceId, ChangedBy, FieldName, OldValue, NewValue)
+        VALUES (@SourceId, @ChangedBy, @FieldName, @OldValue, @NewValue);
+        """;
+
+    private const string SelectSourceAudit = """
+        SELECT AuditId, ChangedAtUtc, ChangedBy, FieldName, OldValue, NewValue
+        FROM FileScan.DataHealthSourceAudit
+        WHERE ApprovedSourceId = @Id
+        ORDER BY ChangedAtUtc DESC, AuditId DESC;
+        """;
+
+    // The column must exist on the named table or view, with the type the source record says. Values are parameters.
+    private const string SelectColumnType = """
+        SELECT typ.name
         FROM sys.columns AS col
         JOIN sys.objects AS obj ON obj.object_id = col.object_id
         JOIN sys.schemas AS sch ON sch.schema_id = obj.schema_id
         JOIN sys.types AS typ ON typ.user_type_id = col.user_type_id
-        WHERE sch.name = @Schema AND obj.name = @Object AND col.name = @Column
-          AND typ.name IN (N'date', N'datetime', N'datetime2', N'smalldatetime', N'datetimeoffset');
+        WHERE sch.name = @Schema AND obj.name = @Object AND col.name = @Column;
         """;
 
     private const string InsertControl = """
@@ -196,51 +228,164 @@ public sealed class DataHealthRepository(IConfiguration configuration)
                 SourceName: reader.GetString(8),
                 SchemaName: reader.GetString(9),
                 ObjectName: reader.GetString(10),
-                DateColumn: reader.GetString(11)));
+                DateColumn: reader.GetString(11),
+                DateColumnType: reader.GetString(12),
+                DateStyles: reader.IsDBNull(13) ? null : reader.GetString(13)));
         }
 
         return controls;
     }
 
-    /// Counts records per day in [from, toExclusive). Names are checked before use and the column must exist with a date type.
-    public async Task<IReadOnlyDictionary<DateOnly, int>> CountByDayAsync(
+    /// Counts records per day in [from, toExclusive). Names must be valid and must exist in the catalog with the configured type.
+    /// Text columns are read with the configured styles; values that match none of them are counted as unreadable.
+    public async Task<CountResult> CountByDayAsync(
         RunnableControl control, DateOnly from, DateOnly toExclusive, CancellationToken cancellationToken = default)
     {
-        if (!DataHealthRules.IsSafeIdentifier(control.SchemaName)
-            || !DataHealthRules.IsSafeIdentifier(control.ObjectName)
-            || !DataHealthRules.IsSafeIdentifier(control.DateColumn))
-            throw new InvalidOperationException("The approved source has an unsafe name.");
+        if (!DataHealthRules.IsValidName(control.SchemaName)
+            || !DataHealthRules.IsValidName(control.ObjectName)
+            || !DataHealthRules.IsValidName(control.DateColumn))
+            throw new InvalidOperationException("The approved source has an invalid name.");
+
+        var isText = DataHealthRules.IsTextType(control.DateColumnType);
+        var styles = isText ? DataHealthRules.ParseStyles(control.DateStyles) : null;
+        if (isText && styles is null)
+            throw new InvalidOperationException("The approved source has no valid date styles.");
 
         await using var connection = await OpenAsync(cancellationToken);
 
-        await using (var check = new SqlCommand(SelectDateColumnCheck, connection) { CommandTimeout = CommandTimeoutSeconds })
+        string? actualType;
+        await using (var check = new SqlCommand(SelectColumnType, connection) { CommandTimeout = CommandTimeoutSeconds })
         {
             check.Parameters.Add("@Schema", SqlDbType.NVarChar, 128).Value = control.SchemaName;
             check.Parameters.Add("@Object", SqlDbType.NVarChar, 128).Value = control.ObjectName;
             check.Parameters.Add("@Column", SqlDbType.NVarChar, 128).Value = control.DateColumn;
-            if (Convert.ToInt32(await check.ExecuteScalarAsync(cancellationToken)) != 1)
-                throw new InvalidOperationException("The approved source no longer matches the database.");
+            actualType = await check.ExecuteScalarAsync(cancellationToken) as string;
         }
 
-        // Only names that passed the pattern and the catalog check above are placed in the text. Values are parameters.
-        var table = $"[{control.SchemaName}].[{control.ObjectName}]";
-        var column = $"[{control.DateColumn}]";
-        var sql = $"""
-            SELECT CAST(d.{column} AS date) AS Day, COUNT(*) AS Cnt
-            FROM {table} AS d
-            WHERE d.{column} >= @From AND d.{column} < @ToExclusive
-            GROUP BY CAST(d.{column} AS date);
-            """;
+        var typeMatches = isText
+            ? DataHealthRules.IsTextType(actualType)
+            : string.Equals(actualType, control.DateColumnType, StringComparison.OrdinalIgnoreCase);
+        if (actualType is null || !typeMatches)
+            throw new InvalidOperationException("The approved source does not match its configured column type.");
+
+        // Only names that passed the validation and the catalog check are quoted into the text. Values are parameters.
+        var sql = isText
+            ? DataHealthSql.CountText(control.SchemaName, control.ObjectName, control.DateColumn, styles!)
+            : DataHealthSql.CountDates(control.SchemaName, control.ObjectName, control.DateColumn);
 
         var counts = new Dictionary<DateOnly, int>();
-        await using var command = new SqlCommand(sql, connection) { CommandTimeout = CommandTimeoutSeconds };
-        command.Parameters.Add("@From", SqlDbType.Date).Value = from.ToDateTime(TimeOnly.MinValue);
-        command.Parameters.Add("@ToExclusive", SqlDbType.Date).Value = toExclusive.ToDateTime(TimeOnly.MinValue);
-        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
-        while (await reader.ReadAsync(cancellationToken))
-            counts[reader.GetFieldValue<DateOnly>(0)] = reader.GetInt32(1);
+        await using (var command = new SqlCommand(sql, connection) { CommandTimeout = CommandTimeoutSeconds })
+        {
+            command.Parameters.Add("@From", SqlDbType.Date).Value = from.ToDateTime(TimeOnly.MinValue);
+            command.Parameters.Add("@ToExclusive", SqlDbType.Date).Value = toExclusive.ToDateTime(TimeOnly.MinValue);
+            await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+            while (await reader.ReadAsync(cancellationToken))
+            {
+                if (!reader.IsDBNull(0))
+                    counts[reader.GetFieldValue<DateOnly>(0)] = reader.GetInt32(1);
+            }
+        }
 
-        return counts;
+        var unreadable = 0;
+        if (isText)
+        {
+            await using var unreadableCommand = new SqlCommand(DataHealthSql.UnreadableText(control.SchemaName, control.ObjectName, control.DateColumn, styles!), connection)
+            {
+                CommandTimeout = CommandTimeoutSeconds,
+            };
+            unreadable = Convert.ToInt32(await unreadableCommand.ExecuteScalarAsync(cancellationToken));
+        }
+
+        return new CountResult(counts, unreadable);
+    }
+
+    /// Changes the date type and styles of an existing approved source. Names and the source itself cannot be changed here.
+    /// Returns NotFound, Conflict (token changed) or Saved. Writes one audit row per changed field.
+    public async Task<SaveOutcome> UpdateSourceFormatAsync(int id, DataHealthSourceFormatInput input, string user, CancellationToken cancellationToken = default)
+    {
+        var token = input.ConcurrencyToken is null ? null : TryDecodeToken(input.ConcurrencyToken);
+        if (token is null)
+            return SaveOutcome.Conflict;
+
+        await using var connection = await OpenAsync(cancellationToken);
+        await using var transaction = connection.BeginTransaction();
+
+        ApprovedSourceDto? current;
+        await using (var read = new SqlCommand(SelectSourceForUpdate, connection, transaction) { CommandTimeout = CommandTimeoutSeconds })
+        {
+            read.Parameters.Add("@Id", SqlDbType.Int).Value = id;
+            await using var reader = await read.ExecuteReaderAsync(cancellationToken);
+            current = await reader.ReadAsync(cancellationToken) ? ReadSource(reader) : null;
+        }
+
+        if (current is null)
+            return SaveOutcome.NotFound;
+
+        if (current.ConcurrencyToken != input.ConcurrencyToken)
+            return SaveOutcome.Conflict;
+
+        var newType = input.DateColumnType!;
+        string? newStyles = null;
+        if (DataHealthRules.IsTextType(newType))
+        {
+            var parsed = DataHealthRules.ParseStyles(input.DateStyles);
+            if (parsed is null)
+                return SaveOutcome.Invalid;
+
+            newStyles = string.Join(",", parsed);
+        }
+
+        var changes = new List<AuditChange>();
+        if (current.DateColumnType != newType)
+            changes.Add(new AuditChange("dateColumnType", current.DateColumnType, newType));
+        if (current.DateStyles != newStyles)
+            changes.Add(new AuditChange("dateStyles", current.DateStyles, newStyles));
+
+        await using (var update = new SqlCommand(UpdateSourceFormat, connection, transaction) { CommandTimeout = CommandTimeoutSeconds })
+        {
+            update.Parameters.Add("@Id", SqlDbType.Int).Value = id;
+            update.Parameters.Add("@DateColumnType", SqlDbType.NVarChar, 20).Value = newType;
+            update.Parameters.Add("@DateStyles", SqlDbType.NVarChar, 100).Value = (object?)newStyles ?? DBNull.Value;
+            update.Parameters.Add("@ConcurrencyToken", SqlDbType.VarBinary, 8).Value = token;
+            if (await update.ExecuteNonQueryAsync(cancellationToken) != 1)
+                return SaveOutcome.Conflict;
+        }
+
+        foreach (var change in changes)
+        {
+            await using var audit = new SqlCommand(InsertSourceAudit, connection, transaction) { CommandTimeout = CommandTimeoutSeconds };
+            audit.Parameters.Add("@SourceId", SqlDbType.Int).Value = id;
+            audit.Parameters.Add("@ChangedBy", SqlDbType.NVarChar, 256).Value = user;
+            audit.Parameters.Add("@FieldName", SqlDbType.NVarChar, 100).Value = change.FieldName;
+            audit.Parameters.Add("@OldValue", SqlDbType.NVarChar, -1).Value = (object?)change.OldValue ?? DBNull.Value;
+            audit.Parameters.Add("@NewValue", SqlDbType.NVarChar, -1).Value = (object?)change.NewValue ?? DBNull.Value;
+            await audit.ExecuteNonQueryAsync(cancellationToken);
+        }
+
+        await transaction.CommitAsync(cancellationToken);
+        return SaveOutcome.Saved;
+    }
+
+    public async Task<IReadOnlyList<AuditEntryDto>> SourceAuditForAsync(int id, CancellationToken cancellationToken = default)
+    {
+        await using var connection = await OpenAsync(cancellationToken);
+        await using var command = new SqlCommand(SelectSourceAudit, connection) { CommandTimeout = CommandTimeoutSeconds };
+        command.Parameters.Add("@Id", SqlDbType.Int).Value = id;
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+
+        var entries = new List<AuditEntryDto>();
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            entries.Add(new AuditEntryDto(
+                reader.GetInt64(0),
+                reader.GetDateTime(1),
+                reader.GetString(2),
+                reader.GetString(3),
+                reader.IsDBNull(4) ? null : reader.GetString(4),
+                reader.IsDBNull(5) ? null : reader.GetString(5)));
+        }
+
+        return entries;
     }
 
     public async Task<int> CreateControlAsync(DataHealthControlInput input, string user, CancellationToken cancellationToken = default)
@@ -431,7 +576,16 @@ public sealed class DataHealthRepository(IConfiguration configuration)
     }
 
     private static ApprovedSourceDto ReadSource(SqlDataReader reader) =>
-        new(reader.GetInt32(0), reader.GetString(1), reader.GetString(2), reader.GetString(3), reader.GetString(4), reader.GetString(5));
+        new(
+            Id: reader.GetInt32(0),
+            SourceKey: reader.GetString(1),
+            DisplayName: reader.GetString(2),
+            SchemaName: reader.GetString(3),
+            ObjectName: reader.GetString(4),
+            DateColumn: reader.GetString(5),
+            DateColumnType: reader.GetString(6),
+            DateStyles: reader.IsDBNull(7) ? null : reader.GetString(7),
+            ConcurrencyToken: Convert.ToBase64String(reader.GetFieldValue<byte[]>(8)));
 
     private static DataHealthControlDto ReadControl(SqlDataReader reader) =>
         new(
