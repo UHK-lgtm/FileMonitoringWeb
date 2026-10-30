@@ -46,7 +46,8 @@ public class DataHealthTextDateTests
         var sql = DataHealthSql.CountText("Import", "CITCO_Position", "ReportDate", new[] { 112 });
 
         Assert.Contains("FROM [Import].[CITCO_Position] AS d", sql);
-        Assert.Contains("COALESCE(TRY_CONVERT(date, d.[ReportDate], 112))", sql);
+        Assert.Contains("TRY_CONVERT(date, d.[ReportDate], 112) AS Day", sql);
+        Assert.DoesNotContain("COALESCE", sql);
         Assert.Contains("WHERE x.Day >= @From AND x.Day < @ToExclusive", sql);
         Assert.Contains("GROUP BY x.Day", sql);
     }
@@ -67,6 +68,15 @@ public class DataHealthTextDateTests
         var sql = DataHealthSql.DayExpression("ReportDate", new[] { 112, 23 });
 
         Assert.Equal("COALESCE(TRY_CONVERT(date, d.[ReportDate], 112), TRY_CONVERT(date, d.[ReportDate], 23))", sql);
+    }
+
+    [Fact]
+    public void One_style_is_used_on_its_own_because_COALESCE_needs_two_arguments()
+    {
+        var sql = DataHealthSql.DayExpression("ReportDate", new[] { 112 });
+
+        Assert.Equal("TRY_CONVERT(date, d.[ReportDate], 112)", sql);
+        Assert.DoesNotContain("COALESCE", sql);
     }
 
     [Fact]

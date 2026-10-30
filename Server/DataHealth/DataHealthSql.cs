@@ -33,8 +33,10 @@ public static class DataHealthSql
     /// The date for a text value: the first style that reads it, or NULL when none does.
     public static string DayExpression(string column, IReadOnlyList<int> styles)
     {
-        var attempts = styles.Select(style => $"TRY_CONVERT(date, d.{Q(column)}, {style})");
-        return $"COALESCE({string.Join(", ", attempts)})";
+        var attempts = styles.Select(style => $"TRY_CONVERT(date, d.{Q(column)}, {style})").ToList();
+
+        // COALESCE needs at least two arguments. A single style is used on its own.
+        return attempts.Count == 1 ? attempts[0] : $"COALESCE({string.Join(", ", attempts)})";
     }
 
     private static string Table(string schema, string obj) => $"{Q(schema)}.{Q(obj)}";
