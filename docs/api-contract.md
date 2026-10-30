@@ -222,8 +222,10 @@ The failure stage and failure type are not returned. They are in the logs, for o
 
 Record-count health checks against approved SQL sources (`docs/Data_Health_Basic_Specifications.md`). Reads run the approved checks. Writes change only the control configuration, and every change is audited. Statuses are `Missing`, `Decrease`, `Increase`, `Stable`, `NoHistory`, and `Error` (a check that could not run; never stored).
 
-- `GET /api/data-health`: the page. Returns `today`, `refreshedAtUtc`, the summary (`enabledSources`, `missingCount`, `decreaseCount`, `errorCount`, `healthy`) and one result per enabled control in display order. Each result has `controlDate`, `controlCount`, `comparisonDate`, `previousCount`, `percentChange`, `latestVisibleDate`, `latestVisibleCount`, `status`, `attention`, `message` and `trend` (one point per day in the window, zeros included). Cached for 30 seconds.
-- `GET /api/data-health/sources`: the approved sources the web app may count. Only an admin adds them (see `sql/006_seed_data_health_sources_TEMPLATE.sql`).
+- `GET /api/data-health`: the page. Returns `today`, `refreshedAtUtc`, the summary (`enabledSources`, `missingCount`, `decreaseCount`, `errorCount`, `healthy`) and one result per enabled control in display order. Each result has `controlDate`, `controlCount`, `comparisonDate`, `previousCount`, `percentChange`, `latestVisibleDate`, `latestVisibleCount`, `status`, `attention`, `message`, `trend` (one point per day in the window, zeros included) and `unreadableCount`. `unreadableCount` is the number of rows in the whole source whose text date matches none of the configured styles. Blank text counts as unreadable; a NULL does not. Cached for 30 seconds.
+- `GET /api/data-health/sources`: the approved sources the web app may count. Each has `id`, `sourceKey`, `displayName`, `schemaName`, `objectName`, `dateColumn`, `dateColumnType`, `dateStyles` (comma-separated, text columns only, otherwise `null`) and `concurrencyToken`. Only an admin adds sources (see `sql/006_seed_data_health_sources_TEMPLATE.sql`).
+- `PUT /api/data-health/sources/{id}/format`: body `{ dateColumnType, dateStyles, concurrencyToken }`. Changes only the date type and styles of an existing source; the schema, table, view and column names cannot be changed here. Returns 200 with the source. 400 with `errors` for an unknown type, a text type without styles, styles on a date type, or a bad style list. 409 when the source changed since it was read. Every change is audited.
+- `GET /api/data-health/sources/{id}/audit`: the format change history, newest first.
 - `GET /api/data-health/controls`, `GET /api/data-health/controls/{id}`: the configuration.
 - `POST /api/data-health/controls`: body `{ name, displayOrder, isEnabled, approvedSourceId, offsetDays, offsetType, historyDays, missingCheck, decreaseCheck, decreaseTolerancePercent }`. Returns 201 with the control. 400 with `errors` for a bad field or an unapproved source.
 - `PUT /api/data-health/controls/{id}`: the same body plus `concurrencyToken`. 409 when the control changed since it was read.
@@ -231,6 +233,8 @@ Record-count health checks against approved SQL sources (`docs/Data_Health_Basic
 - `GET /api/data-health/controls/{id}/audit`: the audit trail, newest first.
 
 Ranges: `offsetDays` 0-60, `historyDays` 1-365, `decreaseTolerancePercent` 0-100, `displayOrder` 0 or more. `offsetType` is `CalendarDays` or `Weekdays`.
+
+Date formats: `dateColumnType` is one of `date`, `datetime`, `datetime2`, `smalldatetime`, `datetimeoffset`, `varchar`, `nvarchar`, `char`, `nchar`. A text type needs `dateStyles`: one or more SQL Server convert styles from the allowed list, comma-separated, in the order they are tried (for example `112,23`). Each style may appear once. A date type must have no styles.
 
 ## Not in this version
 

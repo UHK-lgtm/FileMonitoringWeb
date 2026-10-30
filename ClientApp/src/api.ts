@@ -248,6 +248,9 @@ export const api = {
     request<DataHealthControl>('POST', `/data-health/controls/${id}/enabled`, { isEnabled }),
   retireDataHealthControl: (id: number) => request<DataHealthControl>('POST', `/data-health/controls/${id}/retire`),
   getDataHealthControlAudit: (id: number) => request<AuditEntry[]>('GET', `/data-health/controls/${id}/audit`),
+  updateDataHealthSourceFormat: (id: number, input: DataHealthSourceFormatInput) =>
+    request<ApprovedSource>('PUT', `/data-health/sources/${id}/format`, input),
+  getDataHealthSourceAudit: (id: number) => request<AuditEntry[]>('GET', `/data-health/sources/${id}/audit`),
 }
 
 export type DataHealthStatus = 'Missing' | 'Decrease' | 'Increase' | 'Stable' | 'NoHistory' | 'Error'
@@ -260,6 +263,16 @@ export interface ApprovedSource {
   schemaName: string
   objectName: string
   dateColumn: string
+  dateColumnType: string
+  // Comma-separated convert styles in the order they are tried, for text columns only. Null for date columns.
+  dateStyles: string | null
+  concurrencyToken: string
+}
+
+export interface DataHealthSourceFormatInput {
+  dateColumnType: string
+  dateStyles: string | null
+  concurrencyToken: string
 }
 
 export interface DataHealthControl {
@@ -302,6 +315,8 @@ export interface DataHealthControlResult {
   attention: boolean
   message: string | null
   trend: TrendPoint[]
+  // Rows in the source whose text date matches none of the configured styles. Counted over the whole table.
+  unreadableCount: number
 }
 
 export interface DataHealthResults {

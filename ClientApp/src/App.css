@@ -1101,6 +1101,10 @@ label {
   color: var(--c-ok);
 }
 
+.unreadable-note {
+  color: var(--c-incomplete);
+}
+
 .empty {
   display: grid;
   place-items: center;

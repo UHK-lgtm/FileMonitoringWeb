@@ -35,6 +35,31 @@ const statusBadge: Record<DataHealthStatus, string> = {
   Error: 'status-Missing',
 }
 
+const dateColumnTypes = ['date', 'datetime', 'datetime2', 'smalldatetime', 'datetimeoffset']
+const textColumnTypes = ['varchar', 'nvarchar', 'char', 'nchar']
+
+// Must match DataHealthRules.AllowedStyles on the server.
+const allowedStyles = new Set([23, 101, 102, 103, 104, 105, 106, 107, 110, 111, 112, 113, 114, 120, 121, 126])
+
+/// Reads "112, 23" into [112, 23]. Null when a part is not an allowed style or a style is repeated.
+function parseStyleList(value: string): number[] | null {
+  const styles: number[] = []
+  for (const part of value.split(',').map((item) => item.trim())) {
+    if (!/^\d+$/.test(part)) {
+      return null
+    }
+
+    const style = Number(part)
+    if (!allowedStyles.has(style) || styles.includes(style)) {
+      return null
+    }
+
+    styles.push(style)
+  }
+
+  return styles.length > 0 ? styles : null
+}
+
 function formatDate(value: string | null): string {
   return value === null ? '—' : new Date(`${value}T00:00:00`).toLocaleDateString(undefined, { dateStyle: 'medium' })
 }
@@ -213,6 +238,11 @@ function ResultRow({ row }: { row: DataHealthControlResult }) {
         {row.name}
         <div className="muted small">{row.sourceName}</div>
         {row.message && <div className="small">{row.message}</div>}
+        {row.unreadableCount > 0 && (
+          <div className="small unreadable-note">
+            {row.unreadableCount.toLocaleString()} row(s) have a date that matches none of the configured styles. They are not counted.
+          </div>
+        )}
       </td>
       <td>{formatDate(row.controlDate)}</td>
       <td>{formatCount(row.controlCount)}</td>
@@ -237,6 +267,7 @@ function ConfigureView() {
   const [controls, setControls] = useState<DataHealthControl[]>([])
   const [sources, setSources] = useState<ApprovedSource[]>([])
   const [selection, setSelection] = useState<number | 'new' | null>(null)
+  const [sourceId, setSourceId] = useState<number | null>(null)
   const [audit, setAudit] = useState<{ id: number; entries: AuditEntry[] } | null>(null)
   const [revision, setRevision] = useState(0)
   const [errors, setErrors] = useState<string[]>([])
@@ -345,6 +376,35 @@ function ConfigureView() {
     }
   }
 
+  if (sourceId !== null) {
+    const source = sources.find((item) => item.id === sourceId)
+
+    return (
+      <>
+        <div className="toolbar">
+          <button type="button" className="button secondary" onClick={() => setSourceId(null)}>
+            ← Back to controls
+          </button>
+        </div>
+
+        {source === undefined ? (
+          <p className="muted">Loading…</p>
+        ) : (
+          <SourceFormatEditor
+            key={source.id}
+            source={source}
+            onSaved={(saved) => {
+              setSourceId(null)
+              afterChange(`"${saved.displayName}" date format saved.`)
+            }}
+            onConflict={() => setRevision((current) => current + 1)}
+            onCancel={() => setSourceId(null)}
+          />
+        )}
+      </>
+    )
+  }
+
   if (selection !== null) {
     const isNew = selection === 'new'
     return (
@@ -395,30 +455,7 @@ function ConfigureView() {
               {audit === null || audit.id !== selectedId || audit.entries.length === 0 ? (
                 <p className="muted">No changes recorded.</p>
               ) : (
-                <div className="table-wrap">
-                  <table>
-                    <thead>
-                      <tr>
-                        <th>When</th>
-                        <th>Who</th>
-                        <th>Field</th>
-                        <th>Old value</th>
-                        <th>New value</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {audit.entries.map((entry) => (
-                        <tr key={entry.auditId}>
-                          <td>{formatDateTime(entry.changedAtUtc)}</td>
-                          <td>{entry.changedBy}</td>
-                          <td>{entry.fieldName}</td>
-                          <td className="mono">{entry.oldValue ?? '—'}</td>
-                          <td className="mono">{entry.newValue ?? '—'}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                <AuditTable entries={audit.entries} />
               )}
             </section>
           </>
@@ -428,87 +465,144 @@ function ConfigureView() {
   }
 
   return (
+    <>
+      <SourceList sources={sources} onEdit={setSourceId} />
+
+      <section className="card">
+        <div className="toolbar">
+          <h2>Controls</h2>
+          <button type="button" className="button" onClick={() => setSelection('new')} disabled={sources.length === 0}>
+            New control
+          </button>
+        </div>
+
+        <ErrorList messages={errors} />
+
+        {sources.length === 0 && (
+          <p className="notice error" role="status">
+            No approved sources yet. An administrator adds them with the approved-source script before controls can be created.
+          </p>
+        )}
+
+        {sorted.length === 0 ? (
+          <div className="empty">
+            <strong>No controls yet</strong>
+            <span>Create a control to start checking a source.</span>
+          </div>
+        ) : (
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Order</th>
+                  <th>Control</th>
+                  <th>Source</th>
+                  <th>Offset</th>
+                  <th>State</th>
+                  <th />
+                </tr>
+              </thead>
+              <tbody>
+                {sorted.map((control, index) => (
+                  <tr key={control.id} className={control.isRetired ? 'retired' : undefined}>
+                    <td>
+                      <div className="row-actions">
+                        <button type="button" className="button secondary" aria-label="Move up" disabled={busyId === control.id || index === 0 || control.isRetired} onClick={() => void move(control, -1)}>
+                          ↑
+                        </button>
+                        <button type="button" className="button secondary" aria-label="Move down" disabled={busyId === control.id || index === sorted.length - 1 || control.isRetired} onClick={() => void move(control, 1)}>
+                          ↓
+                        </button>
+                      </div>
+                    </td>
+                    <td>
+                      <button type="button" className="link-button" onClick={() => setSelection(control.id)}>
+                        {control.name}
+                      </button>
+                    </td>
+                    <td>
+                      {control.sourceName}
+                      <div className="muted small mono">{control.sourceKey}</div>
+                    </td>
+                    <td>
+                      {control.offsetDays} {control.offsetType === 'Weekdays' ? 'weekdays' : 'days'} back
+                      <div className="muted small">History {control.historyDays} days</div>
+                    </td>
+                    <td>
+                      <span className={control.isRetired ? 'pill pill-retired' : control.isEnabled ? 'pill pill-on' : 'pill pill-off'}>
+                        {control.isRetired ? 'Retired' : control.isEnabled ? 'Enabled' : 'Disabled'}
+                      </span>
+                    </td>
+                    <td className="actions-cell">
+                      <div className="row-actions">
+                        <button type="button" className="button secondary" onClick={() => setSelection(control.id)}>
+                          {control.isRetired ? 'View' : 'Edit'}
+                        </button>
+                        {!control.isRetired && (
+                          <>
+                            <button type="button" className="button secondary" disabled={busyId === control.id} onClick={() => void toggleEnabled(control)}>
+                              {control.isEnabled ? 'Disable' : 'Enable'}
+                            </button>
+                            <button type="button" className="button danger" disabled={busyId === control.id} onClick={() => void retire(control)}>
+                              Retire
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+    </>
+  )
+}
+
+function SourceList({ sources, onEdit }: { sources: ApprovedSource[]; onEdit: (id: number) => void }) {
+  return (
     <section className="card">
-      <div className="toolbar">
-        <h2>Controls</h2>
-        <button type="button" className="button" onClick={() => setSelection('new')} disabled={sources.length === 0}>
-          New control
-        </button>
-      </div>
+      <h2>Data sources</h2>
+      <p className="muted small">Administrators add sources. Here you can change only how a source's date column is read.</p>
 
-      <ErrorList messages={errors} />
-
-      {sources.length === 0 && (
-        <p className="notice error" role="status">
-          No approved sources yet. An administrator adds them with the approved-source script before controls can be created.
-        </p>
-      )}
-
-      {sorted.length === 0 ? (
+      {sources.length === 0 ? (
         <div className="empty">
-          <strong>No controls yet</strong>
-          <span>Create a control to start checking a source.</span>
+          <strong>No approved sources</strong>
+          <span>An administrator adds them with the approved-source script.</span>
         </div>
       ) : (
         <div className="table-wrap">
           <table>
             <thead>
               <tr>
-                <th>Order</th>
-                <th>Control</th>
                 <th>Source</th>
-                <th>Offset</th>
-                <th>State</th>
+                <th>Date column</th>
+                <th>Date type</th>
+                <th>Text styles</th>
                 <th />
               </tr>
             </thead>
             <tbody>
-              {sorted.map((control, index) => (
-                <tr key={control.id} className={control.isRetired ? 'retired' : undefined}>
+              {sources.map((source) => (
+                <tr key={source.id}>
                   <td>
-                    <div className="row-actions">
-                      <button type="button" className="button secondary" aria-label="Move up" disabled={busyId === control.id || index === 0 || control.isRetired} onClick={() => void move(control, -1)}>
-                        ↑
-                      </button>
-                      <button type="button" className="button secondary" aria-label="Move down" disabled={busyId === control.id || index === sorted.length - 1 || control.isRetired} onClick={() => void move(control, 1)}>
-                        ↓
-                      </button>
+                    {source.displayName}
+                    <div className="muted small mono">{source.sourceKey}</div>
+                  </td>
+                  <td>
+                    <span className="mono">{source.dateColumn}</span>
+                    <div className="muted small mono">
+                      {source.schemaName}.{source.objectName}
                     </div>
                   </td>
-                  <td>
-                    <button type="button" className="link-button" onClick={() => setSelection(control.id)}>
-                      {control.name}
-                    </button>
-                  </td>
-                  <td>
-                    {control.sourceName}
-                    <div className="muted small mono">{control.sourceKey}</div>
-                  </td>
-                  <td>
-                    {control.offsetDays} {control.offsetType === 'Weekdays' ? 'weekdays' : 'days'} back
-                    <div className="muted small">History {control.historyDays} days</div>
-                  </td>
-                  <td>
-                    <span className={control.isRetired ? 'pill pill-retired' : control.isEnabled ? 'pill pill-on' : 'pill pill-off'}>
-                      {control.isRetired ? 'Retired' : control.isEnabled ? 'Enabled' : 'Disabled'}
-                    </span>
-                  </td>
+                  <td>{source.dateColumnType}</td>
+                  <td className="mono">{source.dateStyles ?? '—'}</td>
                   <td className="actions-cell">
-                    <div className="row-actions">
-                      <button type="button" className="button secondary" onClick={() => setSelection(control.id)}>
-                        {control.isRetired ? 'View' : 'Edit'}
-                      </button>
-                      {!control.isRetired && (
-                        <>
-                          <button type="button" className="button secondary" disabled={busyId === control.id} onClick={() => void toggleEnabled(control)}>
-                            {control.isEnabled ? 'Disable' : 'Enable'}
-                          </button>
-                          <button type="button" className="button danger" disabled={busyId === control.id} onClick={() => void retire(control)}>
-                            Retire
-                          </button>
-                        </>
-                      )}
-                    </div>
+                    <button type="button" className="button secondary" onClick={() => onEdit(source.id)}>
+                      Edit format
+                    </button>
                   </td>
                 </tr>
               ))}
@@ -517,6 +611,173 @@ function ConfigureView() {
         </div>
       )}
     </section>
+  )
+}
+
+interface SourceFormatEditorProps {
+  source: ApprovedSource
+  onSaved: (saved: ApprovedSource) => void
+  onConflict: () => void
+  onCancel: () => void
+}
+
+function SourceFormatEditor({ source, onSaved, onConflict, onCancel }: SourceFormatEditorProps) {
+  const [dateColumnType, setDateColumnType] = useState(source.dateColumnType)
+  const [styleText, setStyleText] = useState(source.dateStyles ?? '')
+  const [errors, setErrors] = useState<string[]>([])
+  const [saving, setSaving] = useState(false)
+  const [audit, setAudit] = useState<AuditEntry[] | null>(null)
+  const isText = textColumnTypes.includes(dateColumnType)
+
+  useEffect(() => {
+    let ignore = false
+    api
+      .getDataHealthSourceAudit(source.id)
+      .then((entries) => {
+        if (!ignore) {
+          setAudit(entries)
+        }
+      })
+      .catch((error: unknown) => {
+        if (!ignore) {
+          setErrors(messagesFrom(error))
+        }
+      })
+
+    return () => {
+      ignore = true
+    }
+  }, [source.id])
+
+  async function save(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+
+    let dateStyles: string | null = null
+    if (isText) {
+      const styles = parseStyleList(styleText)
+      if (styles === null) {
+        setErrors(['Enter one or more style numbers from the list, separated by commas. Each one can appear only once.'])
+        return
+      }
+
+      dateStyles = styles.join(',')
+    }
+
+    setSaving(true)
+    setErrors([])
+    try {
+      const saved = await api.updateDataHealthSourceFormat(source.id, { dateColumnType, dateStyles, concurrencyToken: source.concurrencyToken })
+      onSaved(saved)
+    } catch (error) {
+      const status = (error as { status?: number }).status
+      if (status === 409) {
+        setErrors(['This source changed since you opened it. It has been reloaded. Review your changes and save again.'])
+        onConflict()
+      } else {
+        setErrors(messagesFrom(error))
+      }
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <section className="card">
+      <p className="eyebrow">Approved source</p>
+      <h2>{source.displayName}</h2>
+      <p className="muted small">
+        Date column <span className="mono">{source.dateColumn}</span> in <span className="mono">{source.schemaName}.{source.objectName}</span>
+      </p>
+
+      <form className="definition-form" onSubmit={save}>
+        <fieldset disabled={saving}>
+          <div className="form-grid">
+            <label className="field">
+              Column type
+              <select value={dateColumnType} onChange={(event) => setDateColumnType(event.target.value)}>
+                <optgroup label="Date types">
+                  {dateColumnTypes.map((type) => (
+                    <option key={type} value={type}>
+                      {type}
+                    </option>
+                  ))}
+                </optgroup>
+                <optgroup label="Text types">
+                  {textColumnTypes.map((type) => (
+                    <option key={type} value={type}>
+                      {type}
+                    </option>
+                  ))}
+                </optgroup>
+              </select>
+            </label>
+
+            {isText && (
+              <label className="field">
+                Convert styles, in order
+                <input value={styleText} placeholder="112" onChange={(event) => setStyleText(event.target.value)} />
+              </label>
+            )}
+          </div>
+
+          {isText && (
+            <p className="muted small">
+              Text dates are read with these SQL Server style numbers, tried left to right. 112 is yyyyMMdd, 23 is yyyy-MM-dd and 103 is dd/MM/yyyy.
+              Rows that match none of them are reported as unreadable on the results page.
+            </p>
+          )}
+        </fieldset>
+
+        <ErrorList messages={errors} />
+
+        <div className="actions">
+          <button type="submit" className="button" disabled={saving}>
+            {saving ? 'Saving…' : 'Save format'}
+          </button>
+          <button type="button" className="button secondary" onClick={onCancel} disabled={saving}>
+            Cancel
+          </button>
+        </div>
+      </form>
+
+      <h3>Change history</h3>
+      {audit === null ? (
+        <p className="muted">Loading…</p>
+      ) : audit.length === 0 ? (
+        <p className="muted">No changes recorded.</p>
+      ) : (
+        <AuditTable entries={audit} />
+      )}
+    </section>
+  )
+}
+
+function AuditTable({ entries }: { entries: AuditEntry[] }) {
+  return (
+    <div className="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>When</th>
+            <th>Who</th>
+            <th>Field</th>
+            <th>Old value</th>
+            <th>New value</th>
+          </tr>
+        </thead>
+        <tbody>
+          {entries.map((entry) => (
+            <tr key={entry.auditId}>
+              <td>{formatDateTime(entry.changedAtUtc)}</td>
+              <td>{entry.changedBy}</td>
+              <td>{entry.fieldName}</td>
+              <td className="mono">{entry.oldValue ?? '—'}</td>
+              <td className="mono">{entry.newValue ?? '—'}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   )
 }
 
