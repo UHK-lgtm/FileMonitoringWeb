@@ -3,22 +3,20 @@ import './App.css'
 import { auditExportUrl } from './api'
 import { ThemeToggle } from './components/ThemeToggle'
 import { ToastProvider } from './components/Toast'
-import { DefinitionsScreen } from './screens/DefinitionsScreen'
 import { DataHealthScreen } from './screens/DataHealthScreen'
+import { DeliveriesStatusScreen } from './screens/DeliveriesStatusScreen'
 import { DeliveryDetailScreen } from './screens/DeliveryDetailScreen'
-import { TodayScreen } from './screens/TodayScreen'
 import { applyTheme, saveTheme, storedTheme, systemTheme, type Theme } from './theme'
 
-type Section = 'dashboard' | 'definitions' | 'health'
+type Section = 'status' | 'health'
 
 const sectionTitles: Record<Section, string> = {
-  dashboard: "Today's monitoring",
-  definitions: 'Monitoring definitions',
+  status: 'Deliveries status',
   health: 'Data Health',
 }
 
 function App() {
-  const [section, setSection] = useState<Section>('dashboard')
+  const [section, setSection] = useState<Section>('status')
   const [openDeliveryId, setOpenDeliveryId] = useState<number | null>(null)
   const [theme, setTheme] = useState<Theme>(() => storedTheme() ?? systemTheme())
 
@@ -37,7 +35,7 @@ function App() {
     setOpenDeliveryId(null)
   }
 
-  const title = section === 'dashboard' && openDeliveryId !== null ? 'Delivery detail' : sectionTitles[section]
+  const title = section === 'status' && openDeliveryId !== null ? 'Delivery detail' : sectionTitles[section]
 
   return (
     <ToastProvider>
@@ -56,19 +54,11 @@ function App() {
           <nav className="tabs" aria-label="Sections">
             <button
               type="button"
-              className={section === 'dashboard' ? 'tab on' : 'tab'}
-              aria-current={section === 'dashboard' ? 'page' : undefined}
-              onClick={() => selectSection('dashboard')}
+              className={section === 'status' ? 'tab on' : 'tab'}
+              aria-current={section === 'status' ? 'page' : undefined}
+              onClick={() => selectSection('status')}
             >
-              Today
-            </button>
-            <button
-              type="button"
-              className={section === 'definitions' ? 'tab on' : 'tab'}
-              aria-current={section === 'definitions' ? 'page' : undefined}
-              onClick={() => selectSection('definitions')}
-            >
-              Definitions
+              Deliveries status
             </button>
             <button
               type="button"
@@ -95,11 +85,10 @@ function App() {
           </header>
 
           <main className="page">
-            {section === 'dashboard' && openDeliveryId === null && <TodayScreen onOpen={setOpenDeliveryId} />}
-            {section === 'dashboard' && openDeliveryId !== null && (
+            {section === 'status' && openDeliveryId === null && <DeliveriesStatusScreen onOpen={setOpenDeliveryId} />}
+            {section === 'status' && openDeliveryId !== null && (
               <DeliveryDetailScreen expectedDeliveryId={openDeliveryId} onBack={() => setOpenDeliveryId(null)} />
             )}
-            {section === 'definitions' && <DefinitionsScreen />}
             {section === 'health' && <DataHealthScreen />}
           </main>
         </div>
