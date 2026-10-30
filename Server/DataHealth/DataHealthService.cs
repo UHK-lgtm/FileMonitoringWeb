@@ -1,5 +1,6 @@
 using FileMonitoringWeb.Server.Data;
 using FileMonitoringWeb.Server.Domain;
+using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
 
@@ -106,8 +107,12 @@ public sealed class DataHealthService(
         }
         catch (Exception exception) when (!cancellationToken.IsCancellationRequested)
         {
-            // Only the exception type is logged. SQL messages can contain server and object names.
-            logger.LogError("Data Health check {ControlId} could not run: {ExceptionType}", control.ControlId, exception.GetType().Name);
+            // Only the exception type and, for SQL errors, the error number, class and line are logged.
+            // SQL messages can contain server and object names, so the message text is never logged.
+            var sql = exception as SqlException;
+            logger.LogError(
+                "Data Health check {ControlId} could not run: {ExceptionType}, SQL error {SqlErrorNumber}, class {SqlErrorClass}, line {SqlErrorLine}",
+                control.ControlId, exception.GetType().Name, sql?.Number, sql?.Class, sql?.LineNumber);
 
             return new ControlResultDto(
                 ControlId: control.ControlId,
