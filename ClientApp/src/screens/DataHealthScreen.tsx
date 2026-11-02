@@ -11,7 +11,7 @@ import {
 } from '../api'
 import { ErrorList } from '../components/ErrorList'
 import { useToast } from '../components/toastContext'
-import { formatDateTime, todayInLuxembourg } from '../format'
+import { formatLuxembourgDateTime, todayInLuxembourg } from '../format'
 
 type View = 'results' | 'configure'
 
@@ -243,7 +243,7 @@ function ResultsView() {
           {checking > 0 ? (
             <span className="muted small">Checking {finished} of {rows.length}…</span>
           ) : (
-            latestCheck && <span className="muted small">Refreshed {formatDateTime(latestCheck)}</span>
+            latestCheck && <span className="muted small">Refreshed {formatLuxembourgDateTime(latestCheck)}</span>
           )}
         </div>
         <button type="button" className="button secondary" onClick={refresh} disabled={loadingList || checking > 0}>
@@ -337,7 +337,7 @@ function ResultRow({ row }: { row: CheckRow }) {
         {control.name}
         <div className="muted small">{control.sourceName}</div>
         {showingLastKnown && (
-          <div className="muted small">Last checked {formatDateTime(checkedAt)}. Checking now…</div>
+          <div className="muted small">Last checked {formatLuxembourgDateTime(checkedAt)}. Checking now…</div>
         )}
         {state === 'failed' && <div className="small">This check could not run. Ask an administrator to look at the logs.</div>}
         {state === 'done' && result?.message && <div className="small">{result.message}</div>}
@@ -669,7 +669,7 @@ function AuditTable({ entries }: { entries: AuditEntry[] }) {
         <tbody>
           {entries.map((entry) => (
             <tr key={entry.auditId}>
-              <td>{formatDateTime(entry.changedAtUtc)}</td>
+              <td>{formatLuxembourgDateTime(entry.changedAtUtc)}</td>
               <td>{entry.changedBy}</td>
               <td>{entry.fieldName}</td>
               <td className="mono">{entry.oldValue ?? '—'}</td>

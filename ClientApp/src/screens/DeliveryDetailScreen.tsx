@@ -3,7 +3,7 @@ import { api, messagesFrom, type DeliveryDetail } from '../api'
 import { ErrorList } from '../components/ErrorList'
 import { StatusBadge } from '../components/StatusBadge'
 import { useToast } from '../components/toastContext'
-import { formatDateTime, statusLabel } from '../format'
+import { formatDateTime, formatLuxembourgDateTime, statusLabel } from '../format'
 
 interface DeliveryDetailScreenProps {
   expectedDeliveryId: number
@@ -108,8 +108,8 @@ export function DeliveryDetailScreen({ expectedDeliveryId, onBack }: DeliveryDet
                 <StatusBadge status={delivery.status} />
                 <div className="hero-meta">
                   <span>Expected {delivery.expectedDate}</span>
-                  <span>Deadline {formatDateTime(delivery.deadlineUtc)}</span>
-                  <span>Completed {formatDateTime(delivery.completedAtUtc)}</span>
+                  <span>Deadline {formatLuxembourgDateTime(delivery.deadlineUtc)}</span>
+                  <span>Completed {formatLuxembourgDateTime(delivery.completedAtUtc)}</span>
                 </div>
               </div>
               <div className="kpis" style={{ marginBottom: 0 }}>
@@ -158,7 +158,7 @@ export function DeliveryDetailScreen({ expectedDeliveryId, onBack }: DeliveryDet
                         {statusLabel(transition.toStatus)}
                       </strong>
                       <div className="small">
-                        {formatDateTime(transition.occurredAtUtc)} · {transition.receivedFileCount} /{' '}
+                        {formatLuxembourgDateTime(transition.occurredAtUtc)} ·{transition.receivedFileCount} /{' '}
                         {transition.expectedFileCount} received
                       </div>
                     </li>
@@ -192,8 +192,8 @@ export function DeliveryDetailScreen({ expectedDeliveryId, onBack }: DeliveryDet
                       <tr key={index}>
                         <td className="mono">{file.fileName}</td>
                         <td>{file.sizeBytes.toLocaleString()} bytes</td>
-                        <td>{formatDateTime(file.fileLastModifiedUtc)}</td>
-                        <td>{formatDateTime(file.observedAtUtc)}</td>
+                        <td>{formatLuxembourgDateTime(file.fileLastModifiedUtc)}</td>
+                        <td>{formatLuxembourgDateTime(file.observedAtUtc)}</td>
                         <td>
                           <span className={file.isUnexpected ? 'pill pill-off' : 'pill pill-on'}>
                             {file.isUnexpected ? 'Unexpected' : 'Expected'}
@@ -217,7 +217,7 @@ export function DeliveryDetailScreen({ expectedDeliveryId, onBack }: DeliveryDet
                   <div key={index} className="warning-card">
                     <strong>{warningTitles[warning.warningType] ?? warning.warningType}</strong>
                     {warning.detail && <span>{warning.detail}</span>}
-                    <span className="small muted">Detected {formatDateTime(warning.detectedAtUtc)}</span>
+                    <span className="small muted">Detected {formatLuxembourgDateTime(warning.detectedAtUtc)}</span>
                   </div>
                 ))
               )}

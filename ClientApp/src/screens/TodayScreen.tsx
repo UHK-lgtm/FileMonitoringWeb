@@ -3,7 +3,7 @@ import { api, messagesFrom, type DeliveryStatus, type DeliverySummary } from '..
 import { ErrorList } from '../components/ErrorList'
 import { ScanStatusLine } from '../components/ScanStatusLine'
 import { StatusBadge } from '../components/StatusBadge'
-import { formatDateTime, statusLabel, todayInLuxembourg } from '../format'
+import { formatLuxembourgDateTime, statusLabel, todayInLuxembourg } from '../format'
 
 interface TodayScreenProps {
   onOpen: (expectedDeliveryId: number) => void
@@ -164,7 +164,7 @@ export function TodayScreen({ onOpen }: TodayScreenProps) {
               <span className="summary-label">Pending</span>
               <span className="summary-value pending">{counts.Pending}</span>
               <span className="summary-hint">
-                {summary.nextDeadline === null ? 'Before their deadline' : `Next deadline ${formatDateTime(summary.nextDeadline)}`}
+                {summary.nextDeadline === null ? 'Before their deadline' : `Next deadline ${formatLuxembourgDateTime(summary.nextDeadline)}`}
               </span>
             </div>
             <div className="summary-cell">
@@ -316,8 +316,8 @@ export function TodayScreen({ onOpen }: TodayScreenProps) {
                                 </div>
                               </div>
                             </td>
-                            <td>{formatDateTime(item.deadlineUtc)}</td>
-                            <td>{formatDateTime(item.completedAtUtc)}</td>
+                            <td>{formatLuxembourgDateTime(item.deadlineUtc)}</td>
+                            <td>{formatLuxembourgDateTime(item.completedAtUtc)}</td>
                             <td>{item.unexpectedFileCount}</td>
                             <td>
                               {item.warningCount > 0 ? (

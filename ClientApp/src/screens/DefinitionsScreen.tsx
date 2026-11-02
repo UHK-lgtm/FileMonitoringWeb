@@ -5,7 +5,7 @@ import { ErrorList } from '../components/ErrorList'
 import { StatCard } from '../components/StatCard'
 import { useToast } from '../components/toastContext'
 import { daysLabel } from '../definitionRules'
-import { formatDateTime } from '../format'
+import { formatLuxembourgDateTime } from '../format'
 
 // null: the list. 'new': the create page. A number: the edit page for the definition with that id.
 type Selection = number | 'new' | null
@@ -203,7 +203,7 @@ export function DefinitionsScreen() {
                     <tbody>
                       {auditEntries.map((entry) => (
                         <tr key={entry.auditId}>
-                          <td>{formatDateTime(entry.changedAtUtc)}</td>
+                          <td>{formatLuxembourgDateTime(entry.changedAtUtc)}</td>
                           <td>{entry.changedBy}</td>
                           <td>{entry.fieldName}</td>
                           <td className="mono">{entry.oldValue ?? '—'}</td>
