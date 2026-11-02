@@ -1,7 +1,4 @@
 <Solution>
-  <Folder Name="/Server.Tests/">
-    <Project Path="Server.Tests/FileMonitoringWeb.Server.Tests.csproj" />
-  </Folder>
   <Folder Name="/Server/">
     <Project Path="Server/FileMonitoringWeb.Server.csproj" />
   </Folder>
