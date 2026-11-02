@@ -1,8 +1,12 @@
 using FileMonitoringWeb.Server.Data;
 using FileMonitoringWeb.Server.Endpoints;
+using FileMonitoringWeb.Server.Json;
 using Microsoft.AspNetCore.Diagnostics;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Every date-time in a response carries its UTC marker, so the browser shows the right Luxembourg time.
+builder.Services.ConfigureHttpJsonOptions(options => options.SerializerOptions.Converters.Add(new UtcDateTimeConverter()));
 
 builder.Services.AddSingleton<MonitoringDefinitionRepository>();
 builder.Services.AddSingleton<DeliveryRepository>();
