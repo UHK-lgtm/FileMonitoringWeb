@@ -193,6 +193,31 @@ public class DefinitionValidatorTests
     }
 
     [Fact]
+    public void Delivery_time_in_the_skipped_hour_is_rejected()
+    {
+        // 02:00 to 03:00 does not exist on the spring change day in Europe/Luxembourg.
+        var errors = DefinitionValidator.Validate(Valid() with { ExpectedDeliveryTime = "02:30" });
+
+        Assert.Contains(errors, error => error.StartsWith("expectedDeliveryTime and bufferMinutes must not fall in the hour", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Deadline_that_lands_in_the_skipped_hour_is_rejected()
+    {
+        var errors = DefinitionValidator.Validate(Valid() with { ExpectedDeliveryTime = "01:30", BufferMinutes = 60 });
+
+        Assert.Contains(errors, error => error.StartsWith("expectedDeliveryTime and bufferMinutes must not fall in the hour", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Zone_without_daylight_saving_accepts_any_time()
+    {
+        var errors = DefinitionValidator.Validate(Valid() with { TimeZoneId = "UTC", ExpectedDeliveryTime = "02:30" });
+
+        Assert.Empty(errors);
+    }
+
+    [Fact]
     public void Date_mode_needs_the_date_token_and_a_format()
     {
         var errors = DefinitionValidator.Validate(Valid() with { FilenameDateMode = "SameDay" });

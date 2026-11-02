@@ -35,6 +35,7 @@ public static class DefinitionValidator
             errors.Add("bufferMinutes must be between 0 and 1440.");
 
         ValidateTimeZone(input.TimeZoneId, errors);
+        ValidateDeliveryMoment(input, errors);
         ValidateFilenameDate(input, errors);
         ValidateSizeCheck(input, errors);
 
@@ -189,6 +190,52 @@ public static class DefinitionValidator
             errors.Add("timeZoneId must be a valid IANA time zone, such as Europe/Luxembourg.");
         }
     }
+
+    /// The expected time and the deadline (expected time + buffer) must be real, unambiguous local times in the zone.
+    /// When the clocks go forward, the hour after 02:00 does not exist. When they go back, the hour after 02:00 happens twice.
+    /// Checked over the next year, which always includes one March and one October change.
+    private static void ValidateDeliveryMoment(DefinitionInput input, List<string> errors)
+    {
+        if (!TimeOnly.TryParseExact(input.ExpectedDeliveryTime ?? string.Empty, "HH:mm", CultureInfo.InvariantCulture, DateTimeStyles.None, out var time))
+            return;
+
+        if (!TryFindZone(input.TimeZoneId, out var zone))
+            return;
+
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        for (var day = 0; day < 366; day++)
+        {
+            var start = today.AddDays(day).ToDateTime(time);
+            var deadline = start.AddMinutes(input.BufferMinutes);
+            if (IsMissingOrAmbiguous(zone, start) || IsMissingOrAmbiguous(zone, deadline))
+            {
+                errors.Add($"expectedDeliveryTime and bufferMinutes must not fall in the hour when the clocks change in {zone.Id}. Choose a different time.");
+                return;
+            }
+        }
+    }
+
+    private static bool TryFindZone(string? zoneId, out TimeZoneInfo zone)
+    {
+        try
+        {
+            zone = TimeZoneInfo.FindSystemTimeZoneById(zoneId?.Trim() ?? string.Empty);
+            return true;
+        }
+        catch (TimeZoneNotFoundException)
+        {
+            zone = TimeZoneInfo.Utc;
+            return false;
+        }
+        catch (InvalidTimeZoneException)
+        {
+            zone = TimeZoneInfo.Utc;
+            return false;
+        }
+    }
+
+    private static bool IsMissingOrAmbiguous(TimeZoneInfo zone, DateTime local) =>
+        zone.IsInvalidTime(local) || zone.IsAmbiguousTime(local);
 
     private static void ValidateFilenameDate(DefinitionInput input, List<string> errors)
     {
