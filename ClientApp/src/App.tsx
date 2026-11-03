@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import './App.css'
 import { auditExportUrl } from './api'
 import { ThemeToggle } from './components/ThemeToggle'
@@ -19,10 +19,25 @@ function App() {
   const [section, setSection] = useState<Section>('status')
   const [openDeliveryId, setOpenDeliveryId] = useState<number | null>(null)
   const [theme, setTheme] = useState<Theme>(() => storedTheme() ?? systemTheme())
+  // Where the page was scrolled when a delivery opened, so going back returns to the same place.
+  const listScrollY = useRef(0)
 
   useEffect(() => {
     applyTheme(theme)
   }, [theme])
+
+  // The list stays mounted while a delivery is open, so its date and filters survive. Restore the scroll once it is shown again.
+  useLayoutEffect(() => {
+    if (openDeliveryId === null) {
+      window.scrollTo(0, listScrollY.current)
+    }
+  }, [openDeliveryId])
+
+  function openDelivery(expectedDeliveryId: number) {
+    listScrollY.current = window.scrollY
+    setOpenDeliveryId(expectedDeliveryId)
+    window.scrollTo(0, 0)
+  }
 
   function toggleTheme() {
     const next: Theme = theme === 'light' ? 'dark' : 'light'
@@ -33,6 +48,8 @@ function App() {
   function selectSection(next: Section) {
     setSection(next)
     setOpenDeliveryId(null)
+    // Switching tabs starts at the top, not at the position saved for the delivery list.
+    listScrollY.current = 0
   }
 
   const title = section === 'status' && openDeliveryId !== null ? 'Delivery detail' : sectionTitles[section]
@@ -85,7 +102,11 @@ function App() {
           </header>
 
           <main className="page">
-            {section === 'status' && openDeliveryId === null && <DeliveriesStatusScreen onOpen={setOpenDeliveryId} />}
+            {section === 'status' && (
+              <div hidden={openDeliveryId !== null}>
+                <DeliveriesStatusScreen onOpen={openDelivery} />
+              </div>
+            )}
             {section === 'status' && openDeliveryId !== null && (
               <DeliveryDetailScreen expectedDeliveryId={openDeliveryId} onBack={() => setOpenDeliveryId(null)} />
             )}
