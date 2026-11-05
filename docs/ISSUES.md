@@ -8,7 +8,7 @@ Status values: `Open` (needs work), `Decided` (chosen, with a reason), `Fixed`, 
 
 | ID | Decision | Why | Where to change |
 | --- | --- | --- | --- |
-| D-1 | A file counts for an expected delivery only if its last-modified date (in the definition's time zone) is on or after the expected date. Files without a last-modified time are accepted. | Without it, an old file (such as the January test file) makes a later delivery On Time. | `FileScan/FileScannerFunctionApp/DeliveryWindow.cs` |
+| D-1 | A file counts for an expected delivery only if its last-modified date (in the definition's time zone) falls from the expected date up to the day after the deadline. A delivery is checked while its window is open or while it is Pending; after that its status stays as it was. Files without a last-modified time are accepted. | Without the start date, an old file (such as the January test file) makes a later delivery On Time. Without the end date, an open delivery kept collecting files from later days, so a file could count for several deliveries. | `FileScan/FileScannerFunctionApp/DeliveryWindow.cs`, `DeliveryEvidenceService.cs` |
 | D-2 | `{date}` in a file-name pattern is replaced by the date in the mode's format. `PreviousDay` uses the day before the expected date. | The spec does not say how the date fits into the pattern. | `FileScan/FileScannerFunctionApp/FilenameDateRules.cs` |
 | D-3 | Default time zone is `Europe/Luxembourg`, and the default delivery time is 09:00 with no buffer. | The spec mentions Luxembourg and the sample deadlines. | `sql/002_create_v1_schema.sql` |
 | D-4 | "Today" in the web app is the date in Europe/Luxembourg. | Same zone as the deliveries. | `Server/Domain/LocalDates.cs` |
