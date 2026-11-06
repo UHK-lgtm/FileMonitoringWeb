@@ -1,4 +1,5 @@
 using System.Data;
+using FileMonitoringWeb.Server.Domain;
 using FileMonitoringWeb.Server.Models;
 using Microsoft.Data.SqlClient;
 
@@ -126,23 +127,32 @@ public sealed class DeliveryRepository(IConfiguration configuration)
                 reader.IsDBNull(12) ? null : reader.GetDateTime(12));
         }
 
-        var transitions = await ReadAllAsync(connection, SelectTransitions, id, r => new TransitionDto(
+        // Only rows dated inside this delivery's window are shown. Later rows stay in the database as history.
+        // The first status (Pending, FromStatus NULL) is always shown, because it is written before the window opens.
+        var transitions = (await ReadAllAsync(connection, SelectTransitions, id, r => new TransitionDto(
             r.IsDBNull(0) ? null : r.GetString(0),
             r.GetString(1),
             r.GetDateTime(2),
             r.GetDateTime(3),
             r.GetInt32(4),
             r.GetInt32(5),
-            r.GetDateTime(6)), cancellationToken);
+            r.GetDateTime(6)), cancellationToken))
+            .Where(t => t.FromStatus is null
+                || DeliveryDates.InWindow(t.OccurredAtUtc, facts.ExpectedDate, facts.DeadlineUtc, facts.TimeZoneId))
+            .ToList();
 
-        var files = await ReadAllAsync(connection, SelectFiles, id, r => new FileObservationDto(
+        // A file with no last-modified time cannot be placed in a day, so it is shown, as FileScan accepts it.
+        var files = (await ReadAllAsync(connection, SelectFiles, id, r => new FileObservationDto(
             r.GetString(0),
             r.GetString(1),
             r.GetInt64(2),
             r.IsDBNull(3) ? null : r.GetDateTime(3),
             r.IsDBNull(4) ? null : r.GetDateTime(4),
             r.GetDateTime(5),
-            r.GetBoolean(6)), cancellationToken);
+            r.GetBoolean(6)), cancellationToken))
+            .Where(f => f.FileLastModifiedUtc is null
+                || DeliveryDates.InWindow(f.FileLastModifiedUtc.Value, facts.ExpectedDate, facts.DeadlineUtc, facts.TimeZoneId))
+            .ToList();
 
         var warnings = await ReadAllAsync(connection, SelectWarnings, id, r => new WarningDto(
             r.GetString(0),
