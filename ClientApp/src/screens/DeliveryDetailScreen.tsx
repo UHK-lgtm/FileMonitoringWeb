@@ -3,7 +3,7 @@ import { api, messagesFrom, type DeliveryDetail } from '../api'
 import { ErrorList } from '../components/ErrorList'
 import { StatusBadge } from '../components/StatusBadge'
 import { useToast } from '../components/toastContext'
-import { formatDateTime, formatLuxembourgDateTime, statusLabel } from '../format'
+import { formatDateTime, formatLuxembourgDateTime, luxembourgDate, statusLabel } from '../format'
 
 interface DeliveryDetailScreenProps {
   expectedDeliveryId: number
@@ -160,6 +160,10 @@ export function DeliveryDetailScreen({ expectedDeliveryId, onBack }: DeliveryDet
                       <div className="small">
                         {formatLuxembourgDateTime(transition.occurredAtUtc)} ·{transition.receivedFileCount} /{' '}
                         {transition.expectedFileCount} received
+                        {/* After its day, a Missing or Incomplete delivery changes only when recorded files correct it (D-24). */}
+                        {(transition.fromStatus === 'Missing' || transition.fromStatus === 'Incomplete') &&
+                          luxembourgDate(transition.recordedAtUtc) > delivery.expectedDate &&
+                          ` · corrected ${formatLuxembourgDateTime(transition.recordedAtUtc)}`}
                       </div>
                     </li>
                   ))}

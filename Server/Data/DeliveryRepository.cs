@@ -40,7 +40,7 @@ public sealed class DeliveryRepository(IConfiguration configuration)
         SELECT FromStatus, ToStatus, OccurredAtUtc, RecordedAtUtc, ExpectedFileCount, ReceivedFileCount, DeadlineUtc
         FROM FileScan.DeliveryStatusTransition
         WHERE ExpectedDeliveryId = @Id
-        ORDER BY OccurredAtUtc, TransitionId;
+        ORDER BY TransitionId;
         """;
 
     private const string SelectFiles = """
@@ -127,6 +127,8 @@ public sealed class DeliveryRepository(IConfiguration configuration)
                 reader.IsDBNull(12) ? null : reader.GetDateTime(12));
         }
 
+        // Changes are listed in the order they were recorded. A correction made later from recorded files (D-24)
+        // can carry an earlier time than the change it replaces, so time order would put it first.
         // Only rows dated inside this delivery's window are shown. Later rows stay in the database as history.
         // The first status (Pending, FromStatus NULL) is always shown, because it is written before the window opens.
         var transitions = (await ReadAllAsync(connection, SelectTransitions, id, r => new TransitionDto(

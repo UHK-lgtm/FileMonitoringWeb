@@ -81,7 +81,7 @@ Significant status changes, for example `Incomplete` at the deadline and then `L
 
 ### `FileScan.FileObservation`: written by FileScan, append only
 
-File evidence. A row is added only when a file's size or timestamps change. Unique on `ExpectedDeliveryId`, `FileName`, `SizeBytes`, `FileCreatedUtc`, `FileLastModifiedUtc`. `IsUnexpected = 1` marks files beyond the expected count. FileScan also reads these rows for open deliveries, so that a file which has left the folder still counts as received.
+File evidence. A row is added only when a file's size or timestamps change. Unique on `ExpectedDeliveryId`, `FileName`, `SizeBytes`, `FileCreatedUtc`, `FileLastModifiedUtc`. `IsUnexpected = 1` marks files beyond the expected count. FileScan also reads these rows for every Missing, Incomplete or Pending delivery, so that a file which has left the folder still counts as received, also after the delivery's day has ended (D-24 in `docs/ISSUES.md`). For that check it also reads `ExpectedDelivery.ReceivedFileCount`, and writes only when the count or status changes.
 
 ### `FileScan.DeliveryWarning`: written by FileScan
 

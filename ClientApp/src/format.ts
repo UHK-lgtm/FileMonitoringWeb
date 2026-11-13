@@ -34,12 +34,17 @@ export function formatLuxembourgDateTime(value: string | null): string {
   })
 }
 
-/// Today's date in Europe/Luxembourg as yyyy-MM-dd, the business date the API uses by default.
-export function todayInLuxembourg(): string {
+/// The date in Europe/Luxembourg as yyyy-MM-dd, the business date the API uses.
+export function luxembourgDate(value: string | Date): string {
   return new Intl.DateTimeFormat('en-CA', {
     timeZone: 'Europe/Luxembourg',
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
-  }).format(new Date())
+  }).format(new Date(value))
+}
+
+/// Today's date in Europe/Luxembourg as yyyy-MM-dd, the business date the API uses by default.
+export function todayInLuxembourg(): string {
+  return luxembourgDate(new Date())
 }
