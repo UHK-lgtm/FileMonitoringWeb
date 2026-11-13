@@ -138,7 +138,7 @@ public sealed class DeliveryRepository(IConfiguration configuration)
             r.GetInt32(5),
             r.GetDateTime(6)), cancellationToken))
             .Where(t => t.FromStatus is null
-                || DeliveryDates.InWindow(t.OccurredAtUtc, facts.ExpectedDate, facts.DeadlineUtc, facts.TimeZoneId))
+                || DeliveryDates.InWindow(t.OccurredAtUtc, facts.ExpectedDate, facts.TimeZoneId))
             .ToList();
 
         // A file with no last-modified time cannot be placed in a day, so it is shown, as FileScan accepts it.
@@ -151,7 +151,7 @@ public sealed class DeliveryRepository(IConfiguration configuration)
             r.GetDateTime(5),
             r.GetBoolean(6)), cancellationToken))
             .Where(f => f.FileLastModifiedUtc is null
-                || DeliveryDates.InWindow(f.FileLastModifiedUtc.Value, facts.ExpectedDate, facts.DeadlineUtc, facts.TimeZoneId))
+                || DeliveryDates.InWindow(f.FileLastModifiedUtc.Value, facts.ExpectedDate, facts.TimeZoneId))
             .ToList();
 
         var warnings = await ReadAllAsync(connection, SelectWarnings, id, r => new WarningDto(
